@@ -1,2 +1,7 @@
-# WeatherSim
-A project where I simulate weather using a particle system written on the GPU using OpenGL
+# Fluid sim
+A WIP fluid simulation project, using Eulerian fluid simulation techniques, and then visualizing it. 
+
+# Dependancies
+
+# Build
+
