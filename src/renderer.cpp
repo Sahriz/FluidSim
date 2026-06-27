@@ -26,6 +26,9 @@ void Renderer::tempCode() {
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
     glEnableVertexAttribArray(0);
 
+    glDeleteBuffers(1, &VBO);
+    glDeleteBuffers(1, &EBO);
+
     
 
 }
@@ -110,6 +113,7 @@ bool Renderer::init(int width, int height, const char* title) {
     tempCode();
     glUseProgram(m_shader.ID);
     glEnable(GL_CULL_FACE);
+    glEnable(GL_DEPTH_TEST);
     float aspectRatio = float(width) / float(height);
     m_camera.Init(70, aspectRatio, 0.1, 100, m_shader.ID);
 
@@ -117,9 +121,9 @@ bool Renderer::init(int width, int height, const char* title) {
 
 }
 
-void Renderer::render(ParticleSystem& system, frameInput& fInput) {
+void Renderer::render(FluidSim& system, frameInput& fInput) {
     glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
-    glClear(GL_COLOR_BUFFER_BIT);
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
     m_camera.Update(fInput);
 

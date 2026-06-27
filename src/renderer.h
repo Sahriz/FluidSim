@@ -1,6 +1,6 @@
 #pragma once
 
-#include "particleSystem.h"
+#include "FluidSim.h"
 #include <iostream>
 #include "glad/glad.h"
 #include "GLFW/glfw3.h"
@@ -16,7 +16,7 @@ public:
     ~Renderer();
 
     bool init(int width, int height, const char* title);
-    void render(ParticleSystem& system, frameInput& fInput);
+    void render(FluidSim& system, frameInput& fInput);
     void cleanup();
 
     void tempCode();

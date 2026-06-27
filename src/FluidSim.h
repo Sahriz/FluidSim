@@ -1,14 +1,14 @@
 #pragma once
 
 // Owns simulation state and the data buffers the renderer reads.
-class ParticleSystem {
+class FluidSim {
 public:
-    ParticleSystem();
-    ~ParticleSystem();
+    FluidSim();
+    ~FluidSim();
 
     void init(int particleCount);
     void update(float deltaTime);
 
 private:
-    int m_particleCount = 0;
+    int dimensionSize = 512;
 };

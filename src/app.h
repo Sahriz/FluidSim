@@ -1,7 +1,7 @@
 #pragma once
 
 #include "renderer.h"
-#include "particleSystem.h"
+#include "FluidSim.h"
 #include "keyHandler.h"
 #include <iostream>
 
@@ -18,9 +18,8 @@ public:
     void processInput(GLFWwindow* window);
 
 private:
-    GLFWwindow* m_window = nullptr;
     Renderer m_renderer;
-    ParticleSystem m_system;
+    FluidSim m_system;
     std::string title;
     int m_width = 0;
     int m_height = 0;

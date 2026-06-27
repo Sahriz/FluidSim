@@ -14,13 +14,19 @@ App::~App() {
 
 void App::run() {
     GLFWwindow* window = m_renderer.GetWindow();
+    
+    double deltaTime = 0;
+    double previousTime = glfwGetTime();
     while (!glfwWindowShouldClose(window)) {
         handleInputs(window);
+        double time = glfwGetTime();
+        deltaTime = time - previousTime;
 
         m_renderer.render(m_system, fInput);
 
         glfwSwapBuffers(window);
         glfwPollEvents();
+        previousTime = time;
     }
 
     glfwTerminate();
@@ -60,11 +66,11 @@ void App::processInput(GLFWwindow* window) {
     }
     if (fInput.isJustPressed(Key::ToggleMouse)) {
         if (!mouseToggle) {
-            glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_HIDDEN);
+            glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
             mouseToggle = !mouseToggle;
         }
         else {
-            glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+            glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_HIDDEN);
             fInput.dx = 0.0;
             fInput.dy = 0.0;
             mouseToggle = !mouseToggle;
