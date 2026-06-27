@@ -2,8 +2,9 @@
 
 #include "renderer.h"
 #include "particleSystem.h"
+#include "keyHandler.h"
+#include <iostream>
 
-struct GLFWwindow;
 
 // Top-level application: owns the window and drives the main loop.
 class App {
@@ -12,11 +13,17 @@ public:
     ~App();
 
     void run();
+    void handleInputs(GLFWwindow* window);
+    void getMouseInput(GLFWwindow* window);
+    void processInput(GLFWwindow* window);
 
 private:
     GLFWwindow* m_window = nullptr;
     Renderer m_renderer;
     ParticleSystem m_system;
+    std::string title;
     int m_width = 0;
     int m_height = 0;
+    frameInput fInput;
+    bool mouseToggle = true;
 };

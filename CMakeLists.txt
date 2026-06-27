@@ -9,6 +9,33 @@ find_package(OpenGL REQUIRED)
 add_subdirectory(vendor/glfw)
 add_subdirectory(vendor/glm)
 
+# --- Dear ImGui --------------------------------------------------------------
+# ImGui ships no CMakeLists of its own, so we compile the core + the two
+# backends we need (GLFW for input/windowing, OpenGL3 for drawing) into a
+# small static library. PUBLIC include dirs mean any target that links
+# `imgui` automatically sees <imgui.h> and the backend headers.
+set(IMGUI_PATH "${CMAKE_CURRENT_SOURCE_DIR}/vendor/imgui")
+
+add_library(imgui STATIC
+    "${IMGUI_PATH}/imgui.cpp"
+    "${IMGUI_PATH}/imgui_draw.cpp"
+    "${IMGUI_PATH}/imgui_tables.cpp"
+    "${IMGUI_PATH}/imgui_widgets.cpp"
+    "${IMGUI_PATH}/imgui_demo.cpp"
+    "${IMGUI_PATH}/backends/imgui_impl_glfw.cpp"
+    "${IMGUI_PATH}/backends/imgui_impl_opengl3.cpp"
+)
+
+target_include_directories(imgui PUBLIC
+    "${IMGUI_PATH}"
+    "${IMGUI_PATH}/backends"
+)
+
+# imgui_impl_glfw.cpp #includes <GLFW/glfw3.h>; linking glfw forwards its
+# include path. The OpenGL3 backend uses its own bundled GL loader, so it
+# does not need Glad.
+target_link_libraries(imgui PUBLIC glfw)
+
 
 set(GLAD_PATH "${CMAKE_CURRENT_SOURCE_DIR}/vendor/Glad")
 
@@ -17,6 +44,9 @@ set(HEADER_FILES
     src/renderer.h
     src/particleSystem.h
     src/Shader.h
+    src/meshing.h
+    src/Camera.h
+    src/keyHandler.h
 )
 
 set(SOURCE_FILES
@@ -24,6 +54,7 @@ set(SOURCE_FILES
     src/app.cpp
     src/renderer.cpp
     src/particleSystem.cpp
+    src/meshing.cpp
     "${GLAD_PATH}/src/glad.c"
 )
 
@@ -51,6 +82,7 @@ target_compile_definitions(FluidSim PRIVATE
 target_link_libraries(FluidSim PRIVATE
     OpenGL::GL
     glfw
+    imgui
 )
 
 # Copy shaders to build directory
