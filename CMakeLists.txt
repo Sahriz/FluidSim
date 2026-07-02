@@ -41,22 +41,24 @@ set(GLAD_PATH "${CMAKE_CURRENT_SOURCE_DIR}/vendor/Glad")
 
 set(HEADER_FILES
     src/app.h
-    src/renderer.h
     src/FluidSim.h
     src/Shader.h
     src/meshing.h
     src/Camera.h
     src/keyHandler.h
     src/Scene.h
+    src/CubeScene.h
+    src/Window.h
+    src/TerrainScene.h
 )
 
 set(SOURCE_FILES
     src/main.cpp
     src/app.cpp
-    src/renderer.cpp
     src/FluidSim.cpp
     src/meshing.cpp
-    src/Scene.cpp
+    src/CubeScene.cpp
+    src/TerrainScene.cpp
     "${GLAD_PATH}/src/glad.c"
 )
 
