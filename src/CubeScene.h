@@ -51,7 +51,6 @@ public:
 	void update(float dt, frameInput& in) override {
 		m_camera.Update(in);
 		glUniform1f(scaleLoc, m_scale);
-		render();
 	}
 
 	void render() override{

@@ -1,11 +1,18 @@
 #pragma once
 #include <array>
+#include "glm.hpp"
 
 enum class Key {
     RotateLeft,
     RotateRight,
     CloseWindow,
     ToggleMouse,
+    MoveLeft,
+    MoveRight,
+    MoveForward,
+    MoveBackward,
+    Descend,
+    Ascend,
     Count
 };
 
@@ -16,6 +23,7 @@ public:
     double dx = 0.0, dy = 0.0;
     double lastX = 0.0, lastY = 0.0;
     bool firstMouse = true;
+    glm::vec3 inputDirection = glm::vec3(0.0);
 
     void updateKeyState() {
         previousKeys = currentKeys;

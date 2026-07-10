@@ -50,6 +50,7 @@ set(HEADER_FILES
     src/CubeScene.h
     src/Window.h
     src/TerrainScene.h
+    src/TerrainCamera.h
 )
 
 set(SOURCE_FILES
@@ -67,6 +68,8 @@ set(SHADER_FILES
     shaders/render.frag
     shaders/CompShader.comp
     shaders/InitCompShader.comp
+    shaders/TerrainRender.frag
+    shaders/TerrainRender.vert
 )
 
 source_group("Shaders" FILES ${SHADER_FILES})

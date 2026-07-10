@@ -7,7 +7,7 @@ App::App(int width, int height, const char* title)
     
     if (!initWindowSucess) std::cout << "error setting up window" << std::endl;
     initImGui();
-    switchScene(SceneId::CubeTest);
+    switchScene(SceneId::FluidSim);
 }
 
 void App::initImGui() {
@@ -47,7 +47,8 @@ void App::run() {
         deltaTime = time - previousTime;
 
         m_currentScene->update(deltaTime,fInput);
-
+        m_currentScene->render();
+        
         drawCommonUI();
         m_currentScene->drawUI();
 
@@ -71,6 +72,12 @@ void App::handleInputs(GLFWwindow* window) {
     fInput.setKeyState(Key::RotateRight, glfwGetKey(window, GLFW_KEY_RIGHT) == GLFW_PRESS);
     fInput.setKeyState(Key::RotateLeft, glfwGetKey(window, GLFW_KEY_LEFT) == GLFW_PRESS);
     fInput.setKeyState(Key::ToggleMouse, glfwGetKey(window, GLFW_KEY_TAB) == GLFW_PRESS);
+    fInput.setKeyState(Key::MoveLeft, glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS);
+    fInput.setKeyState(Key::MoveRight, glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS);
+    fInput.setKeyState(Key::MoveForward, glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS);
+    fInput.setKeyState(Key::MoveBackward, glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS);
+    fInput.setKeyState(Key::Descend, glfwGetKey(window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS);
+    fInput.setKeyState(Key::Ascend, glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS);
 
     processInput(window);
     if (!mouseToggle) {
@@ -110,6 +117,25 @@ void App::processInput(GLFWwindow* window) {
             mouseToggle = !mouseToggle;
         }
     }
+    fInput.inputDirection = glm::vec3(0.0);
+    if (fInput.isDown(Key::MoveLeft)) {
+        fInput.inputDirection.x += -1;
+    }
+    if (fInput.isDown(Key::MoveRight)) {
+        fInput.inputDirection.x += 1;
+    }
+    if (fInput.isDown(Key::MoveForward)) {
+        fInput.inputDirection.z += 1;
+    }
+    if (fInput.isDown(Key::MoveBackward)) {
+        fInput.inputDirection.z += -1;
+    }
+    if (fInput.isDown(Key::Descend)) {
+        fInput.inputDirection.y += -1;
+    }
+    if (fInput.isDown(Key::Ascend)) {
+        fInput.inputDirection.y += 1;
+    }
 }
 
 void App::switchScene(SceneId id) {
@@ -119,6 +145,7 @@ void App::switchScene(SceneId id) {
 
     switch (id) {
         case SceneId::CubeTest: m_currentScene = std::make_unique<CubeScene>(m_width, m_height, "CubeScene"); break;
+        case SceneId::FluidSim: m_currentScene = std::make_unique<FluidSim>(m_width, m_height, "FluidSim"); break;
         case SceneId::TerrainScene: m_currentScene = std::make_unique<TerrainScene>(m_width, m_height, "TerrainScene"); break;
         default: 
             std::cout << "switchScene: unhandled Sceneid" << std::endl;
