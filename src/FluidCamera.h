@@ -5,14 +5,23 @@
 #include "gtc/type_ptr.hpp"
 #include "keyHandler.h"
 
-class TerrainCamera {
+class FluidCamera {
 public:
-	TerrainCamera() = default;
+	FluidCamera() = default;
 
-	void Init(float fov, float aspectRatio, float nearPlane, float farPlane, GLuint ID) {
+	void Init(float fov, float aspectRatio, float nearPlane, float farPlane, GLuint ID, int dimensions) {
 		perspectiveMat = glm::perspective(glm::radians(fov), aspectRatio, nearPlane, farPlane);
 		perpectiveLoc = glGetUniformLocation(ID, "projection");
 		glUniformMatrix4fv(perpectiveLoc, 1, GL_FALSE, glm::value_ptr(perspectiveMat));
+
+		inverseViewProjLoc = glGetUniformLocation(ID, "invViewProjMat");
+		camPosLoc = glGetUniformLocation(ID, "camPos");
+		boxMinLoc = glGetUniformLocation(ID, "boxMin");
+		boxMaxLoc = glGetUniformLocation(ID, "boxMax");
+
+		glUniform1i(boxMinLoc, -dimensions / 2);
+		glUniform1i(boxMaxLoc, dimensions / 2);
+		
 
 		viewLoc = glGetUniformLocation(ID, "view");
 		computeView();
@@ -43,6 +52,11 @@ public:
 
 		viewMat = glm::lookAt(eye, eye + forward, worldUp);
 		glUniformMatrix4fv(viewLoc, 1, GL_FALSE, glm::value_ptr(viewMat));
+
+		glUniform3fv(camPosLoc, 1, glm::value_ptr(eye));
+
+		inverseViewProjMat = glm::inverse(perspectiveMat * viewMat);
+		glUniformMatrix4fv(inverseViewProjLoc, 1, GL_FALSE, glm::value_ptr(inverseViewProjMat));
 		
 	}
 
@@ -57,6 +71,11 @@ public:
 
 	glm::mat4 perspectiveMat;
 	glm::mat4 viewMat;
+	glm::mat4 inverseViewProjMat;
+
+	GLuint inverseViewProjLoc;
+	GLuint camPosLoc;
+	GLuint boxMinLoc, boxMaxLoc;
 
 	GLint perpectiveLoc;
 	GLint viewLoc;

@@ -42,6 +42,7 @@ set(GLAD_PATH "${CMAKE_CURRENT_SOURCE_DIR}/vendor/Glad")
 set(HEADER_FILES
     src/app.h
     src/FluidSim.h
+    src/FluidCamera.h
     src/Shader.h
     src/meshing.h
     src/Camera.h
@@ -66,7 +67,7 @@ set(SOURCE_FILES
 set(SHADER_FILES
     shaders/render.vert
     shaders/render.frag
-    shaders/CompShader.comp
+    shaders/Noise.comp
     shaders/InitCompShader.comp
     shaders/TerrainRender.frag
     shaders/TerrainRender.vert

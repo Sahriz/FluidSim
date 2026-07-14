@@ -3,94 +3,293 @@
 #include <iostream>
 #include "Scene.h"
 #include <vector>
+#include "FluidCamera.h"
+#include <fstream>
+#include <sstream>
 
 class FluidSim : public Scene {
 public:
 	FluidSim(int width, int height, std::string title) :Scene(title), m_width(width), m_height(height) {
-		for (size_t x = 0; x < meshWidth; x++) {
-			for (size_t z = 0; z < meshDepth; z++) {
-				glm::vec3 position = glm::vec3(x - meshWidth / 2.0, -1.0, z - meshDepth / 2.0);
-				verts.push_back(position);
-			}
-		}
-		for (size_t x = 0; x < meshWidth - 1; x++) {
-			for (size_t z = 0; z < meshDepth - 1; z++) {
-				int id1 = z + x * meshWidth;
-				int id2 = z + (x + 1) * meshWidth;
-				int id3 = id1 + 1;
-				int id4 = id2 + 1;
-				indices.push_back(id1);
-				indices.push_back(id3);
-				indices.push_back(id2);
-				indices.push_back(id4);
-				indices.push_back(id2);
-				indices.push_back(id3);
-			}
-		}
 	}
 
 	~FluidSim() override = default;
 
+	template <typename T>
+	void CreateBuffer(GLuint& ID, size_t size) {
+		glGenBuffers(1, &ID);
+		glBindBuffer(GL_SHADER_STORAGE_BUFFER, ID);
+		glBufferData(GL_SHADER_STORAGE_BUFFER, size * sizeof(T), NULL, GL_DYNAMIC_COPY);
+	}
+
+	std::string readFile(const std::string& filePath) {
+		std::ifstream file(filePath);
+		std::stringstream buffer;
+		if (file) {
+			buffer << file.rdbuf();
+		}
+		else {
+			std::cerr << "Failed to open file: " << filePath << "\n";
+		}
+		return buffer.str();
+	}
+	
+	GLuint CreateComputeShaderProgram(const std::string& path) {
+		GLuint shader = glCreateShader(GL_COMPUTE_SHADER);
+		std::string source = readFile(path);
+		if (source.empty()) {
+			std::cerr << "Shader source is empty: " << path << "\n";
+			glDeleteShader(shader);
+			return 0;
+		}
+		const char* src = source.c_str();
+		glShaderSource(shader, 1, &src, nullptr);
+		glCompileShader(shader);
+
+		// Check compilation status
+		GLint success;
+		glGetShaderiv(shader, GL_COMPILE_STATUS, &success);
+		if (!success) {
+			GLint logLength;
+			glGetShaderiv(shader, GL_INFO_LOG_LENGTH, &logLength);
+			std::vector<char> log(logLength);
+			glGetShaderInfoLog(shader, logLength, nullptr, log.data());
+			std::cerr << "Compute Shader compilation failed:\n" << log.data() << std::endl;
+			glDeleteShader(shader);
+			return 0;
+		}
+		// Link shader into a program
+		GLuint program = glCreateProgram();
+		glAttachShader(program, shader);
+		glLinkProgram(program);
+
+		glGetProgramiv(program, GL_LINK_STATUS, &success);
+		if (!success) {
+			GLint logLength;
+			glGetProgramiv(program, GL_INFO_LOG_LENGTH, &logLength);
+			std::vector<char> log(logLength);
+			glGetProgramInfoLog(program, logLength, nullptr, log.data());
+			std::cerr << "Program linking failed:\n" << log.data() << std::endl;
+			glDeleteShader(shader);
+			glDeleteProgram(program);
+			return 0;
+		}
+		glDeleteShader(shader); // Safe to delete after linking
+		return program;
+	}
+
+	void InitNoiseUniforms() {
+		amplitudeLoc = glGetUniformLocation(m_noiseShader, "amplitude");
+		frequencyLoc = glGetUniformLocation(m_noiseShader, "frequency");
+		persistanceLoc = glGetUniformLocation(m_noiseShader, "persistance");
+		lacunarityLoc = glGetUniformLocation(m_noiseShader, "lacunarity");
+		octaveLoc = glGetUniformLocation(m_noiseShader, "octaves");
+		dimensionLoc = glGetUniformLocation(m_noiseShader, "dimension");
+		timeLoc = glGetUniformLocation(m_noiseShader, "time");
+		typeNoiseLoc = glGetUniformLocation(m_noiseShader, "typeOfNoise");
+	}
+
+	void InitTextures() {
+		glGenTextures(1, &volumeTex);
+		glBindTexture(GL_TEXTURE_3D, volumeTex);
+		glTexStorage3D(GL_TEXTURE_3D, 1, GL_R32F, dimensions, dimensions, dimensions);
+
+		glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+		glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+		glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+		glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+		glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
+
+		int detailSize = dimensions / 4;
+
+		glGenTextures(1, &detailTex);
+		glBindTexture(GL_TEXTURE_3D, detailTex);
+		glTexStorage3D(GL_TEXTURE_3D, 1, GL_R32F, detailSize, detailSize, detailSize);
+
+		glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+		glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+		glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+		glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+		glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_R, GL_REPEAT);
+	}
+
+	void InitShaders() {
+		m_noiseShader = CreateComputeShaderProgram(std::string(SHADER_DIR) + "Noise.comp");
+	}
+
+	void createDetail() {
+		glUseProgram(m_noiseShader);
+		glBindImageTexture(0, detailTex, 0, GL_TRUE, 0, GL_WRITE_ONLY, GL_R32F);
+
+		glUniform1f(amplitudeLoc, 0.1f);
+		glUniform1f(frequencyLoc, 0.012f*12);
+		glUniform1f(lacunarityLoc, 2.0f);
+		glUniform1f(persistanceLoc, 0.5f);
+		glUniform1i(octaveLoc, 6);
+		glUniform1i(dimensionLoc, dimensions/4);
+		glUniform1f(timeLoc, 0.0f);
+		glUniform1i(typeNoiseLoc, 1);
+
+
+		int N = dimensions / (8 * 4);
+		glDispatchCompute(N, N, N);
+
+		glMemoryBarrier(GL_TEXTURE_FETCH_BARRIER_BIT);
+	}
+
+	void createNoise() {
+		glUseProgram(m_noiseShader);
+		glBindImageTexture(0, volumeTex, 0, GL_TRUE, 0, GL_WRITE_ONLY, GL_R32F);
+
+		glUniform1f(amplitudeLoc, 1.0f);
+		glUniform1f(frequencyLoc, 0.007f);
+		glUniform1f(lacunarityLoc, 2.0f);
+		glUniform1f(persistanceLoc, 0.5f);
+		glUniform1i(octaveLoc, 6);
+		glUniform1i(dimensionLoc,dimensions);
+		glUniform1f(timeLoc, time);
+		glUniform1i(typeNoiseLoc, 0);
+		
+		int N = dimensions / 8;
+		glDispatchCompute(N, N, N);
+
+		glMemoryBarrier(GL_TEXTURE_FETCH_BARRIER_BIT);
+	}
+
 	void onEnter() override {
-		std::string vertPath = std::string(SHADER_DIR) + "TerrainRender.vert";
-		std::string fragPath = std::string(SHADER_DIR) + "TerrainRender.frag";
+		std::string vertPath = std::string(SHADER_DIR) + "FluidRender.vert";
+		std::string fragPath = std::string(SHADER_DIR) + "FluidRender.frag";
 
 		m_shader.init(vertPath, fragPath);
 
-		initTerrain();
+		InitProgram();
 		glUseProgram(m_shader.ID);
 		float aspectRatio = float(m_width) / float(m_height);
-		m_camera.Init(70, aspectRatio, 0.1, 1000, m_shader.ID);
-		scaleLoc = glGetUniformLocation(m_shader.ID, "scale");
-		noiseScaleLoc = glGetUniformLocation(m_shader.ID, "noiseScale");
-		ampLoc = glGetUniformLocation(m_shader.ID, "amplitude");
-		sampleScaleLoc = glGetUniformLocation(m_shader.ID, "sampleScale");
-		freqLoc = glGetUniformLocation(m_shader.ID, "frequency");
-		lacLoc = glGetUniformLocation(m_shader.ID, "lacunarity");
-		perLoc = glGetUniformLocation(m_shader.ID, "persistance");
+		m_camera.Init(70, aspectRatio, 0.1, 1000, m_shader.ID, dimensions);
+		glEnable(GL_DEPTH_TEST);
+		glEnable(GL_BLEND);
+		glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);   // src*alpha + dst*(1-alpha)
+	}
+	void InitGrid() {
+		grid.reserve(dimensions * dimensions * dimensions);
+		for (int z = -dimensions/2; z < dimensions/2; z++) {
+			for (int y = -dimensions / 2; y < dimensions / 2; y++) {
+				for (int x = -dimensions / 2; x < dimensions / 2; x++) {
+					float value = sqrt(x * x + y * y + z * z) < dimensions/3.0f ? 1.0f : 0.0f;
+					grid.push_back(value);
+				}
+			}
+		}
+	}
+	void InitVectors() {
+		for (int x = 0; x < dimensions - 1; x++) {
+			for (int y = 0; y < dimensions - 1; y++) {
+				for (int z = 0; z < dimensions-1; z++) {
+					int cubeIndex = 0;
+					int gridIndex = x + dimensions * y + dimensions * dimensions * z;
+					int bitListValue = 1;
+					for (int i = 0; i < 8; i++) {
+						int vertCoord = gridIndex + cornerOffsets[i];
+						if (grid[vertCoord] < 0.5) cubeIndex |= bitListValue;
+						bitListValue *= 2;
+					}
+
+					if (edgeTable[cubeIndex] == 0) {
+						continue;
+					}
+
+					glm::vec3 p[8];
+					float val[8];
+					for (int i = 0; i < 8; i++) {
+						p[i] = glm::vec3(x, y, z) + glm::vec3(cornerDelta[i]) - glm::vec3(dimensions/2.0);
+						val[i] = grid[gridIndex + cornerOffsets[i]];
+					}
+
+					glm::vec3 vertList[12];
+					for (int i = 0; i < 12; i++) {
+						if (edgeTable[cubeIndex] & (1 << i)) {
+							int a = edgeCorners[i][0];
+							int b = edgeCorners[i][1];
+							vertList[i] = vertInterp(0.5f, p[a], p[b], val[a], val[b]);
+						}
+					}
+
+					int ntriang = 0;
+					for (int i = 0; triTable[cubeIndex][i] != -1; i += 3) {
+						glm::vec3 v1 = vertList[triTable[cubeIndex][i]];
+						glm::vec3 v2 = vertList[triTable[cubeIndex][i + 1]];
+						glm::vec3 v3 = vertList[triTable[cubeIndex][i + 2]];
+						glm::vec3 n = glm::normalize(glm::cross(v2 - v1, v3 - v1));
+
+						verts.push_back(v1);
+						verts.push_back(v3);
+						verts.push_back(v2);
+						
+						normals.push_back(n);
+						normals.push_back(n);
+						normals.push_back(n);
+					}
+
+				}
+			}
+		}
 	}
 
-	void initTerrain() {
-		int cubeIndex = 0;
-		if()
+	void InitBuffers() {
+		glGenVertexArrays(1, &VAO);
+		glBindVertexArray(VAO);
+
+		volumeLoc = glGetUniformLocation(m_shader.ID, "volume");
+		detailLoc = glGetUniformLocation(m_shader.ID, "detailNoise");
+	}
+
+	void InitProgram() {
+		InitBuffers();
+		InitShaders();
+		InitNoiseUniforms();
+		InitTextures();
+		createDetail();
+		createNoise();
+	}
+
+	glm::vec3 vertInterp(float isoLevel, glm::vec3 p1, glm::vec3 p2, float valp1, float valp2) {
+		if (std::abs(isoLevel - valp1) < 0.00001f) return p1;
+		if (std::abs(isoLevel - valp2) < 0.00001f) return p2;
+		if (std::abs(valp1 - valp2) < 0.00001f) return p1;
+		float mu = (isoLevel - valp1) / (valp2 - valp1);
+		return p1 + mu * (p2 - p1);
 	}
 
 	void onExit() override {
 		glDeleteVertexArrays(1, &VAO);
-		glDeleteBuffers(1, &VBO);
-		glDeleteBuffers(1, &EBO);
+		glDeleteBuffers(1, &vertVBO);
+		glDeleteBuffers(1, &normalVBO);
 	}
 
 	void update(float dt, frameInput& in) override {
+		
 		m_camera.Update(in);
-		glUniform1f(scaleLoc, m_scale);
-		glUniform1f(noiseScaleLoc, m_noiseScale);
-		glUniform1f(ampLoc, m_noiseAmp);
-		glUniform1f(sampleScaleLoc, m_sampleScale);
-		glUniform1f(freqLoc, m_frequency);
-		glUniform1f(lacLoc, m_lacunarity);
-		glUniform1f(perLoc, m_persistance);
+		time += dt;
 	}
 
 	void render() override {
-		glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
+		glClearColor(0.2f, 0.3f, 0.8f, 1.0f);
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
+		createNoise();
 		glUseProgram(m_shader.ID);
 		glBindVertexArray(VAO);
-		glDrawElements(GL_TRIANGLES, std::size(indices), GL_UNSIGNED_INT, (void*)0);
+		glUniform1i(volumeLoc, 0);
+		glUniform1i(detailLoc, 1);
+		glActiveTexture(GL_TEXTURE0);
+		glBindTexture(GL_TEXTURE_3D, volumeTex);
+		glActiveTexture(GL_TEXTURE1);
+		glBindTexture(GL_TEXTURE_3D, detailTex);
+
+		glDrawArrays(GL_TRIANGLES, 0, 3);
 	}
 
 	void drawUI() override {
 		const char* title = Scene::m_title.c_str();
 		ImGui::Begin(title);
-		ImGui::SliderFloat("Scale", &m_scale, 0.05f, 1.0f);
-		ImGui::SliderFloat("noiseScale", &m_noiseScale, 0.005f, 0.08f);
-		ImGui::SliderFloat("sampleScale", &m_sampleScale, 0.005f, 0.08f);
-		ImGui::SliderFloat("Amplitude", &m_noiseAmp, 0.1f, 200.0f);
-		ImGui::SliderFloat("Frequency", &m_frequency, 20.0f, 2000.0f);
-		ImGui::SliderFloat("Lacunarity", &m_lacunarity, 1.0f, 8.0f);
-		ImGui::SliderFloat("Persistance", &m_persistance, 0.1f, 1.0f);
 		ImGui::End();
 
 	}
@@ -98,21 +297,41 @@ public:
 
 
 private:
-
-
-	float m_scale = 0.1f, m_noiseScale = 0.02, m_sampleScale = 0.01f, m_noiseAmp = 50.0, m_frequency = 200.0f, m_lacunarity = 2.0f, m_persistance = 0.5f;
-	int meshWidth = 1000, meshDepth = 1000;
+	int dimensions = 128;
 	Shader m_shader;
-	TerrainCamera m_camera;
-	unsigned int VAO, VBO, EBO;
+	FluidCamera m_camera;
+	unsigned int VAO, vertVBO, normalVBO;
 	int m_width, m_height;
-	GLint scaleLoc, noiseScaleLoc, sampleScaleLoc, ampLoc, freqLoc, lacLoc, perLoc;
+	float time = 0;
+
+	//3d textures
+	GLuint volumeTex;
+	GLuint detailTex;
+	GLuint volumeLoc, detailLoc;
+
+	//Noise variables
+	GLuint m_noiseShader, m_detailShader;
+	GLuint amplitudeLoc, frequencyLoc, persistanceLoc, lacunarityLoc, octaveLoc, dimensionLoc, timeLoc, typeNoiseLoc;
 
 	std::vector<glm::vec3> verts;
-	std::vector<unsigned int> indices;
+	std::vector<glm::vec3> normals;
 
-	int grid[32][32][32];
+	std::vector<float> grid;
 
+	 int cornerOffsets[8] =
+	{
+		0,1,1+dimensions*dimensions,dimensions*dimensions,dimensions,1+dimensions,1+dimensions+dimensions*dimensions,dimensions+dimensions*dimensions
+	};
+	 glm::ivec3 cornerDelta[8] = {
+	{0,0,0}, {1,0,0}, {1,0,1}, {0,0,1},   // bottom ring, same order as cornerOffsets
+	{0,1,0}, {1,1,0}, {1,1,1}, {0,1,1}    // top ring
+	 };
+
+	 int edgeCorners[12][2] = {
+	{0,1}, {1,2}, {2,3}, {3,0},   // bottom ring  (edges 0-3)
+	{4,5}, {5,6}, {6,7}, {7,4},   // top ring     (edges 4-7)
+	{0,4}, {1,5}, {2,6}, {3,7}    // verticals    (edges 8-11)
+	 };
 	int edgeTable[256] = {
 0x0  , 0x109, 0x203, 0x30a, 0x406, 0x50f, 0x605, 0x70c,
 0x80c, 0x905, 0xa0f, 0xb06, 0xc0a, 0xd03, 0xe09, 0xf00,

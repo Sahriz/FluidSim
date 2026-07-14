@@ -4,6 +4,7 @@
 #include "Scene.h"
 #include <vector>
 
+
 class TerrainScene : public Scene {
 public:
 	TerrainScene(int width, int height, std::string title) :Scene(title), m_width(width), m_height(height) {

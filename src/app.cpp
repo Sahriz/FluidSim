@@ -25,6 +25,8 @@ App::~App() {
 void App::drawCommonUI() {
     const char* title = m_currentScene->m_title.c_str();
     ImGui::Begin(title);
+    float fps = ImGui::GetIO().Framerate;
+    ImGui::Text("%.1f FPS (%.2f ms/frame)", fps, 1000.0f / fps);
     const char* sceneNames[] = {"CubeScene", "FluidSim", "TerrainScene"};
     if (ImGui::Combo("Scene", &m_sceneIndex, sceneNames, IM_ARRAYSIZE(sceneNames))) {
         switchScene(static_cast<SceneId>(m_sceneIndex));
