@@ -44,7 +44,7 @@ public:
 		glm::vec3 right = glm::normalize(glm::cross(forward, worldUp));
 		glm::vec3 up = glm::normalize(glm::cross(right, forward));
 
-		float moveSpeed = 0.5f;
+		float moveSpeed = 2.5f;
 
 		eye += right * fInput.inputDirection.x * moveSpeed;
 		eye += up * fInput.inputDirection.y * moveSpeed;

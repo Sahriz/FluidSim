@@ -87,7 +87,7 @@ float fbm(vec3 pos){
 	float maxValue = 0.0;
 	
 	for(int i = 0; i < octaves; i++){
-		float val = abs(snoise(vec3(pos) * f)) * amp;
+		float val = snoise(vec3(pos) * f) * amp;
 		accum += val;
 		maxValue += amp;
 		f *= lacunarity;
@@ -128,18 +128,74 @@ vec3 fbm3(vec3 pos, int octave){
 	return newPos;
 }
 
+uvec3 pcg3d(uvec3 v) {
+    v = v * 1664525u + 1013904223u;
+    v.x += v.y * v.z;
+    v.y += v.z * v.x;
+    v.z += v.x * v.y;
+    v ^= v >> 16u;
+    v.x += v.y * v.z;
+    v.y += v.z * v.x;
+    v.z += v.x * v.y;
+    return v;
+}
+
+vec3 hash3(ivec3 c) {
+    return vec3(pcg3d(uvec3(c))) * (1.0 / 4294967295.0);
+}
+
+float worley(vec3 p, float numCells) {      // p in [0,1], tiles!
+    p *= numCells;                          // cell space
+    ivec3 cell = ivec3(floor(p));
+    float minDist = 1e10;
+    for (int x = -1; x <= 1; x++)
+    for (int y = -1; y <= 1; y++)
+    for (int z = -1; z <= 1; z++) {
+        ivec3 neighbor = cell + ivec3(x, y, z);
+        ivec3 wrapped  = ivec3(mod(vec3(neighbor), numCells));   // <- makes it TILE
+        vec3 featurePoint = vec3(neighbor) + hash3(wrapped);      // point in that cell, [0,1]^3 offset
+        minDist = min(minDist, distance(p, featurePoint));
+    }
+    return 1.0 - clamp(minDist, 0.0, 1.0);   // inverted: blobby
+}
+
+float fbmWorley(vec3 p, float numCells){
+	float accum = 0.0;
+	float f = frequency;
+	float amp = amplitude;
+	float maxValue = 0.0;
+	
+	for(int i = 0; i < 3; i++){
+		float val = amp * worley(p, numCells);
+		accum += val;
+		maxValue += amp;
+		numCells *= 2.0;
+		amp *= persistance;
+	}
+	accum /= maxValue;
+	return accum;
+}
+
+float remap(float x, float a, float b, float c, float d) {
+    return c + (x - a) * (d - c) / (b - a);
+}
+
 void main() {
 	if(typeOfNoise == 0){
 		ivec3 texel = ivec3(gl_GlobalInvocationID);
 		vec3 texelFloat = vec3(texel);
-		float noiseValue = fbm(vec3(texelFloat + vec3(time*5,0,0)) + 194 * fbm3(texelFloat, 3))* 0.5 + 0.5;
+		float noiseValue = fbm(vec3(texelFloat + vec3(time*0,0,0)))* 0.5 + 0.5;
 
 		float h = float(texel.y) / dimension;                  // 0..1
-		float profile = smoothstep(0.0, 0.15, h) * (1.0 - smoothstep(0.5, 0.9, h));
+		float profile = smoothstep(0.0, 0.55, h) * (1.0 - smoothstep(0.5, 0.9, h));
+		float worleyValue = fbmWorley((texelFloat+vec3(time*0,0,0))/dimension, 3.0);
 
-		noiseValue *= profile;
+		float perlinWorley = clamp(remap(noiseValue, 1.0 - worleyValue, 1.0, 0.0, 1.0), 0.0, 1.0);
 
-		float density = smoothstep(0.65, 1.0, noiseValue);
+		perlinWorley *= profile;
+		
+
+		float density = smoothstep(0.1, 0.1+0.08, perlinWorley);
 
 	
 
@@ -147,7 +203,7 @@ void main() {
 	}
 	else if(typeOfNoise == 1){
 		ivec3 texel = ivec3(gl_GlobalInvocationID);
-		float noiseValue = fbm(vec3(texel)) * 0.5 + 0.5;
+		float noiseValue = fbmWorley((vec3(texel) + vec3(time*1,0,0)) / dimension, 16.0);
 		imageStore(volume, texel, vec4(vec3(noiseValue),1.0));
 	}
 	else{

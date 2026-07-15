@@ -11,11 +11,11 @@ uniform int boxMax;
 in vec2 uv;
 out vec4 FragColor;
 
-const vec3 lightDir = normalize(vec3(1.0, 1.0, 1.0));
-const vec3 lightColor = vec3(20.0, 20.0, 20.0);
+const vec3 lightDir = normalize(vec3(0.6, 0.35, 0.3));
+const vec3 lightColor = vec3(16*3, 14.5*3, 12*3);
 
-const float detailScale    = 4.0;   // tiling repeats across the box — make uniform
-const float detailStrength = 0.5;   // make uniform, slider
+const float detailScale    = 8.0;   // tiling repeats across the box — make uniform
+const float detailStrength = 2.0;   // make uniform, slider
 const float densityScale   = 2.0;   // make uniform, slider
 
 float hg(float cosTheta, float g) {
@@ -34,12 +34,11 @@ float sampleDensity(vec3 pos) {
 float lightMarch(vec3 pos) {
     float lightStepSize = 2.0;  // step size along the light ray
     float opticalDepth = 0.0;
-    for (int i = 0; i < 15; i++) {       // 4-6 steps is plenty
-        pos += lightDir * lightStepSize;                              // step along -lightDir (or toward light)
-        vec3 uvw = (pos - vec3(boxMin)) / (vec3(boxMax) - vec3(boxMin));                               // world pos -> 0..1 texture coords (the two-doors conversion)
+    for (int i = 0; i < 30; i++) {       // 4-6 steps is plenty
+        pos += lightDir * lightStepSize;                              // step along -lightDir (or toward light)s
         opticalDepth += sampleDensity(pos) * lightStepSize;  // accumulate density along the light ray
     }
-    return exp(-opticalDepth * 0.5);       // 1 = fully sunlit, 0 = deep shadow
+    return opticalDepth;       // 1 = fully sunlit, 0 = deep shadow
 }
 
 void main() {
@@ -61,29 +60,44 @@ void main() {
     if(tExit < 0.0 || tEnter > tExit) { FragColor = vec4(0.2, 0.3, 0.8, 1.0); return; }
 
     float stepSize = 0.5;                              // total distance inside box / numSteps
-    int   numSteps = min(int((tExit - tEnter) / stepSize) + 1, 256);  // limit to 100 steps for performance
+    int   numSteps = int((tExit - tEnter) / stepSize) + 1;  // limit to 100 steps for performance
+    if(numSteps > 256){
+        numSteps = 256;
+        stepSize = (tExit - tEnter) / 256.0;
+    }
     vec3  color = vec3(0.0);
     float transmittance = 1.0;
     const vec3 skyColor = vec3(0.2, 0.3, 0.8);
-    const vec3 ambient  = vec3(0.10, 0.2, 0.4);   // faint blue sky-fill
 
     float cosTheta = dot(rayDir, lightDir);
     float phase = mix(hg(cosTheta, 0.6), hg(cosTheta, -0.2), 0.3);   // forward lobe + mild 
 
     float jitter = fract(sin(dot(gl_FragCoord.xy, vec2(12.9898, 78.233))) * 43758.5453);
     for (int i = 0; i < numSteps; i++) {
+
         float t = tEnter + (float(i) + jitter) * stepSize;   // replaces the fixed +0.5
         vec3 pos  = rayOrigin + t * rayDir;
-        vec3 uvw  = (pos - vec3(boxMin)) / (vec3(boxMax) - vec3(boxMin));                               // world pos -> 0..1 texture coords (the two-doors conversion)
+        vec3 uvw  = (pos - vec3(boxMin)) / (vec3(boxMax) - vec3(boxMin)); 
+        
         float density = sampleDensity(pos);
         if(density > 0.001) {
-            float sunVisibility = lightMarch(pos);                          // shadowing
-            vec3 sampleColor = lightColor * sunVisibility * phase + ambient;  // light * shadow + ambient
-            float slabTrans = exp(-density * stepSize);  // Beer-Lambert law
-            color += sampleColor * (1-slabTrans) * transmittance;
-            transmittance *= slabTrans;                         // Beer-Lambert law
+            float tau = lightMarch(pos) * 0.1;   // shadowing
+            float sunTerm = exp(-tau) + 0.35 * exp(-tau * 0.25) + 0.12 * exp(-tau * 0.06);
+
+            float powder = 1.0 - exp(-2.0 * tau);  // Beer-Lambert law
+            sunTerm *= mix(1.0, powder, 0.5);  // add some powdery scattering to the sun
+
+            vec3 ambient = mix(vec3(0.08, 0.10, 0.14), vec3(0.22, 0.30, 0.45), uvw.y);   
+            vec3 sampleColor = lightColor * sunTerm * phase + ambient;
+
+            float slabTrans  = exp(-density * stepSize);      // this slab's own opacity
+            color           += sampleColor * (1.0 - slabTrans) * transmittance;
+            transmittance   *= slabTrans;
+
         }  
         if(transmittance < 0.01) break;  // early exit if almost opaque
     }
+    color = vec3(1.0) - exp(-color * 0.6);  // convert from optical depth to color
+    color = pow(color, vec3(1.0 / 2.2));
     FragColor = vec4(color + skyColor * transmittance, 1.0);
 }

@@ -120,13 +120,13 @@ public:
 		glUseProgram(m_noiseShader);
 		glBindImageTexture(0, detailTex, 0, GL_TRUE, 0, GL_WRITE_ONLY, GL_R32F);
 
-		glUniform1f(amplitudeLoc, 0.1f);
-		glUniform1f(frequencyLoc, 0.012f*12);
+		glUniform1f(amplitudeLoc, 1.0f);
+		glUniform1f(frequencyLoc, 0.0f);
 		glUniform1f(lacunarityLoc, 2.0f);
 		glUniform1f(persistanceLoc, 0.5f);
-		glUniform1i(octaveLoc, 6);
+		glUniform1i(octaveLoc, 0);
 		glUniform1i(dimensionLoc, dimensions/4);
-		glUniform1f(timeLoc, 0.0f);
+		glUniform1f(timeLoc, time);
 		glUniform1i(typeNoiseLoc, 1);
 
 
@@ -141,7 +141,7 @@ public:
 		glBindImageTexture(0, volumeTex, 0, GL_TRUE, 0, GL_WRITE_ONLY, GL_R32F);
 
 		glUniform1f(amplitudeLoc, 1.0f);
-		glUniform1f(frequencyLoc, 0.007f);
+		glUniform1f(frequencyLoc, 0.008f);
 		glUniform1f(lacunarityLoc, 2.0f);
 		glUniform1f(persistanceLoc, 0.5f);
 		glUniform1i(octaveLoc, 6);
@@ -275,6 +275,7 @@ public:
 		glClearColor(0.2f, 0.3f, 0.8f, 1.0f);
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 		createNoise();
+		createDetail();
 		glUseProgram(m_shader.ID);
 		glBindVertexArray(VAO);
 		glUniform1i(volumeLoc, 0);
