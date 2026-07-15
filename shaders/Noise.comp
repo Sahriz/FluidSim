@@ -10,6 +10,9 @@ uniform int octaves;
 uniform int dimension;
 uniform float time;
 uniform int typeOfNoise;
+uniform float numCells;
+uniform float timeScale;
+uniform int useTimeScale;
 
 //
 // Description : Array and textureless GLSL 2D/3D/4D simplex noise functions.
@@ -144,7 +147,7 @@ vec3 hash3(ivec3 c) {
     return vec3(pcg3d(uvec3(c))) * (1.0 / 4294967295.0);
 }
 
-float worley(vec3 p, float numCells) {      // p in [0,1], tiles!
+float worley(vec3 p) {      // p in [0,1], tiles!
     p *= numCells;                          // cell space
     ivec3 cell = ivec3(floor(p));
     float minDist = 1e10;
@@ -159,17 +162,17 @@ float worley(vec3 p, float numCells) {      // p in [0,1], tiles!
     return 1.0 - clamp(minDist, 0.0, 1.0);   // inverted: blobby
 }
 
-float fbmWorley(vec3 p, float numCells){
+float fbmWorley(vec3 p){
 	float accum = 0.0;
 	float f = frequency;
 	float amp = amplitude;
 	float maxValue = 0.0;
-	
+	float ncells = numCells;
 	for(int i = 0; i < 3; i++){
-		float val = amp * worley(p, numCells);
+		float val = amp * worley(p);
 		accum += val;
 		maxValue += amp;
-		numCells *= 2.0;
+		ncells *= 2.0;
 		amp *= persistance;
 	}
 	accum /= maxValue;
@@ -184,11 +187,15 @@ void main() {
 	if(typeOfNoise == 0){
 		ivec3 texel = ivec3(gl_GlobalInvocationID);
 		vec3 texelFloat = vec3(texel);
-		float noiseValue = fbm(vec3(texelFloat + vec3(time*0,0,0)))* 0.5 + 0.5;
+		vec3 timeOffset = vec3(0.0 , 0.0, 0.0);
+		if(useTimeScale == 1){
+			timeOffset = vec3(time * timeScale, 0.0, 0.0);
+		}
+		float noiseValue = fbm(vec3(texelFloat + timeOffset))* 0.5 + 0.5;
 
 		float h = float(texel.y) / dimension;                  // 0..1
 		float profile = smoothstep(0.0, 0.55, h) * (1.0 - smoothstep(0.5, 0.9, h));
-		float worleyValue = fbmWorley((texelFloat+vec3(time*0,0,0))/dimension, 3.0);
+		float worleyValue = fbmWorley((texelFloat+timeOffset)/dimension);
 
 		float perlinWorley = clamp(remap(noiseValue, 1.0 - worleyValue, 1.0, 0.0, 1.0), 0.0, 1.0);
 
@@ -203,7 +210,11 @@ void main() {
 	}
 	else if(typeOfNoise == 1){
 		ivec3 texel = ivec3(gl_GlobalInvocationID);
-		float noiseValue = fbmWorley((vec3(texel) + vec3(time*1,0,0)) / dimension, 16.0);
+		vec3 timeOffset = vec3(0.0 , 0.0, 0.0);
+		if(useTimeScale == 1){
+			timeOffset = vec3(time * timeScale, 0.0, 0.0);
+		}
+		float noiseValue = fbmWorley((vec3(texel) + timeOffset) / dimension);
 		imageStore(volume, texel, vec4(vec3(noiseValue),1.0));
 	}
 	else{

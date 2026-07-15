@@ -36,7 +36,7 @@ private:
     std::string title;
     int m_width = 0;
     int m_height = 0;
-    int m_sceneIndex = 0;
+    int m_sceneIndex = 1;
     frameInput fInput;
     bool mouseToggle = true;
 };
