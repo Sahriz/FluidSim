@@ -172,7 +172,7 @@ float fbmWorley(vec3 p){
 		float val = amp * worley(p, ncells);
 		accum += val;
 		maxValue += amp;
-		ncells *= 2.0;
+		ncells *= lacunarity;
 		amp *= persistance;
 	}
 	accum /= maxValue;

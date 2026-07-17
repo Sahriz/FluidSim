@@ -179,6 +179,8 @@ public:
 		glClearColor(0.2f, 0.3f, 0.8f, 1.0f);
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 		glMemoryBarrier(GL_TEXTURE_FETCH_BARRIER_BIT);
+		m_pipeline[PassBase].continuous = timeEffect;
+		m_pipeline[PassDetail].continuous = timeEffectDetail;
 		runPipeline(m_pipeline);
 		m_shader.use();
 		updateUniforms();
@@ -196,28 +198,32 @@ public:
 
 	void drawUI() override {
 		//First section
+
+		
 		if (ImGui::CollapsingHeader("Cloud Settings", ImGuiTreeNodeFlags_DefaultOpen)) {
+			auto& basePass = m_pipeline[PassBase];
 			if (ImGui::CollapsingHeader("Density Noise Settings", ImGuiTreeNodeFlags_DefaultOpen)) {
-				ImGui::SliderFloat("Amplitude", &amplitude, 0.0f, 5.0f);
-				ImGui::SliderFloat("Frequency", &frequency, 0.0f, 0.1f);
-				ImGui::SliderFloat("Persistance", &persistance, 0.0f, 1.0f);
-				ImGui::SliderFloat("Lacunarity", &lacunarity, 0.0f, 5.0f);
-				ImGui::SliderInt("Octaves", &octaves, 1, 10);
-				ImGui::SliderFloat("Number of Cells", &numCells, 2.0f, 64.0f);
-				ImGui::SliderFloat("Time Scale", &timeScale, 0.0f, 25.0f);
-				ImGui::Checkbox("Time Effect", &timeEffect);
+				basePass.dirty |= ImGui::SliderFloat("Amplitude", &amplitude, 0.0f, 5.0f);
+				basePass.dirty |= ImGui::SliderFloat("Frequency", &frequency, 0.0f, 0.1f);
+				basePass.dirty |= ImGui::SliderFloat("Persistance", &persistance, 0.0f, 1.0f);
+				basePass.dirty |= ImGui::SliderFloat("Lacunarity", &lacunarity, 0.0f, 5.0f);
+				basePass.dirty |= ImGui::SliderInt("Octaves", &octaves, 1, 10);
+				basePass.dirty |= ImGui::SliderFloat("Number of Cells", &numCells, 2.0f, 64.0f);
+				basePass.dirty |= ImGui::SliderFloat("Time Scale", &timeScale, 0.0f, 25.0f);
+				basePass.dirty |= ImGui::Checkbox("Time Effect", &timeEffect);
 			}
 		
 			ImGui::Separator();
 		
 			//Second section
+			auto& detailPass = m_pipeline[PassDetail];
 			if (ImGui::CollapsingHeader("Detail Noise Settings", ImGuiTreeNodeFlags_DefaultOpen)) {
-				ImGui::SliderFloat("Detail Amplitude", &amplitudeDetail, 16, 256);
-				ImGui::SliderFloat("Detail Persistance", &persistanceDetail, 0.0f, 1.0f);
-				ImGui::SliderFloat("Detail Lacunarity", &lacunarityDetail, 0.0f, 5.0f);
-				ImGui::SliderFloat("Detail Number of Cells", &numCellsDetail, 2.0f, 64.0f);
-				ImGui::SliderFloat("Detail Time Scale", &timeScaleDetail, 0.0f, 25.0f);
-				ImGui::Checkbox("Detail Time Effect", &timeEffectDetail);
+				detailPass.dirty |= ImGui::SliderFloat("Detail Amplitude", &amplitudeDetail, 16, 256);
+				detailPass.dirty |= ImGui::SliderFloat("Detail Persistance", &persistanceDetail, 0.0f, 1.0f);
+				detailPass.dirty |= ImGui::SliderFloat("Detail Lacunarity", &lacunarityDetail, 0.0f, 5.0f);
+				detailPass.dirty |= ImGui::SliderFloat("Detail Number of Cells", &numCellsDetail, 2.0f, 64.0f);
+				detailPass.dirty |= ImGui::SliderFloat("Detail Time Scale", &timeScaleDetail, 0.0f, 25.0f);
+				detailPass.dirty |= ImGui::Checkbox("Detail Time Effect", &timeEffectDetail);
 			}
 		
 			ImGui::Spacing();
@@ -261,7 +267,7 @@ private:
 	int dimensions = 128;
 	Shader m_shader;
 	std::vector<ComputePass> m_pipeline;
-	enum PassIndex { PassBase = 0, PaseDetail = 1 };
+	enum PassIndex { PassBase = 0, PassDetail = 1 };
 	FluidCamera m_camera;
 	unsigned int VAO;
 	int m_width, m_height;
