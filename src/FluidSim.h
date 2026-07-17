@@ -6,6 +6,7 @@
 #include "FluidCamera.h"
 #include <fstream>
 #include <sstream>
+#include "ComputePass.h"
 
 class FluidSim : public Scene {
 public:
@@ -22,97 +23,57 @@ public:
 		glBufferData(GL_SHADER_STORAGE_BUFFER, size * sizeof(T), NULL, GL_DYNAMIC_COPY);
 	}
 
-	std::string readFile(const std::string& filePath) {
-		std::ifstream file(filePath);
-		std::stringstream buffer;
-		if (file) {
-			buffer << file.rdbuf();
-		}
-		else {
-			std::cerr << "Failed to open file: " << filePath << "\n";
-		}
-		return buffer.str();
-	}
-	
-	GLuint CreateComputeShaderProgram(const std::string& path) {
-		GLuint shader = glCreateShader(GL_COMPUTE_SHADER);
-		std::string source = readFile(path);
-		if (source.empty()) {
-			std::cerr << "Shader source is empty: " << path << "\n";
-			glDeleteShader(shader);
-			return 0;
-		}
-		const char* src = source.c_str();
-		glShaderSource(shader, 1, &src, nullptr);
-		glCompileShader(shader);
+	void buildPipeline() {
+		m_pipeline.clear();
 
-		// Check compilation status
-		GLint success;
-		glGetShaderiv(shader, GL_COMPILE_STATUS, &success);
-		if (!success) {
-			GLint logLength;
-			glGetShaderiv(shader, GL_INFO_LOG_LENGTH, &logLength);
-			std::vector<char> log(logLength);
-			glGetShaderInfoLog(shader, logLength, nullptr, log.data());
-			std::cerr << "Compute Shader compilation failed:\n" << log.data() << std::endl;
-			glDeleteShader(shader);
-			return 0;
-		}
-		// Link shader into a program
-		GLuint program = glCreateProgram();
-		glAttachShader(program, shader);
-		glLinkProgram(program);
+		ComputePass base;
+		base.name = "Cloud base";
+		base.shader.init(std::string(SHADER_DIR) + "Noise.comp");
+		base.groups = glm::ivec3(dimensions / 8);
+		base.barrierAfter = GL_TEXTURE_FETCH_BARRIER_BIT;
 
-		glGetProgramiv(program, GL_LINK_STATUS, &success);
-		if (!success) {
-			GLint logLength;
-			glGetProgramiv(program, GL_INFO_LOG_LENGTH, &logLength);
-			std::vector<char> log(logLength);
-			glGetProgramInfoLog(program, logLength, nullptr, log.data());
-			std::cerr << "Program linking failed:\n" << log.data() << std::endl;
-			glDeleteShader(shader);
-			glDeleteProgram(program);
-			return 0;
-		}
-		glDeleteShader(shader); // Safe to delete after linking
-		return program;
-	}
+		base.shader.set("typeOfNoise", 0);
+		
+		base.shader.set("dimension", dimensions);
+		base.bind = [this](Shader& s, int) {
+			glBindImageTexture(0, volumeTex, 0, GL_TRUE, 0, GL_WRITE_ONLY, GL_R32F);
 
-	void InitNoiseUniforms() {
-		amplitudeLoc = glGetUniformLocation(m_noiseShader, "amplitude");
-		frequencyLoc = glGetUniformLocation(m_noiseShader, "frequency");
-		persistanceLoc = glGetUniformLocation(m_noiseShader, "persistance");
-		lacunarityLoc = glGetUniformLocation(m_noiseShader, "lacunarity");
-		octaveLoc = glGetUniformLocation(m_noiseShader, "octaves");
-		dimensionLoc = glGetUniformLocation(m_noiseShader, "dimension");
-		timeLoc = glGetUniformLocation(m_noiseShader, "time");
-		typeNoiseLoc = glGetUniformLocation(m_noiseShader, "typeOfNoise");
-		numCellsLoc = glGetUniformLocation(m_noiseShader, "numCells");
-		timeScaleLoc = glGetUniformLocation(m_noiseShader, "timeScale");
-		timeCheckBoxLoc = glGetUniformLocation(m_noiseShader, "useTimeScale");
-	}
+			s.set("amplitude", amplitude);
+			s.set("frequency", frequency);
+			s.set("lacunarity", lacunarity);
+			s.set("persistance", persistance);
+			s.set("octaves", octaves);
+			s.set("time", time);
+			s.set("dimension", dimensions);
+			s.set("typeOfNoise", 0);
+			s.set("numCells", numCells);
+			s.set("timeScale", timeScale);
+			s.set("useTimeScale", timeEffect ? 1 : 0);
+			};
 
-	void InitShaderUniforms() {
+		m_pipeline.push_back(std::move(base));
 
-		detailScaleLoc = glGetUniformLocation(m_shader.ID, "detailScale");
-		detailStrengthLoc = glGetUniformLocation(m_shader.ID, "detailStrength");
-		densityScaleLoc = glGetUniformLocation(m_shader.ID, "densityScale");
-		lightDirLoc = glGetUniformLocation(m_shader.ID, "lightDir");
-		lightColorLoc = glGetUniformLocation(m_shader.ID, "lightColor");
-		lightStrengthLoc = glGetUniformLocation(m_shader.ID, "lightStrength");
-		skyColorLoc = glGetUniformLocation(m_shader.ID, "skyColor");
-		exposureLoc = glGetUniformLocation(m_shader.ID, "exposure");
-		shadowDensityLoc = glGetUniformLocation(m_shader.ID, "shadowDensity");
-		phaserGLoc = glGetUniformLocation(m_shader.ID, "phaserG");
-		nearShadowReachLoc = glGetUniformLocation(m_shader.ID, "nearShadowReach");
-		farShadowReachLoc = glGetUniformLocation(m_shader.ID, "farShadowReach");
-		stepSizeLoc = glGetUniformLocation(m_shader.ID, "stepSize");
-		maxStepsLoc = glGetUniformLocation(m_shader.ID, "maxSteps");
-		powderMixLoc = glGetUniformLocation(m_shader.ID, "powderMix");
-		AmbientColorTopLoc = glGetUniformLocation(m_shader.ID, "ambientColorTop");
-		AmbientColorBottomLoc = glGetUniformLocation(m_shader.ID, "ambientColorBottom");
-		useJitterLoc = glGetUniformLocation(m_shader.ID, "useJitter");
-		useDetailNoiseLoc = glGetUniformLocation(m_shader.ID, "useDetailNoise");
+		ComputePass detail;
+		detail.name = "Cloud detail";
+		detail.shader.init(std::string(SHADER_DIR) + "Noise.comp");
+		detail.groups = glm::ivec3(dimensions / (4 * 8));
+		detail.barrierAfter = GL_TEXTURE_FETCH_BARRIER_BIT;
+		detail.shader.set("typeOfNoise", 1);
+		detail.shader.set("dimension", dimensions / 4);
+		detail.bind = [this](Shader& s, int) {
+			glBindImageTexture(0, detailTex, 0, GL_TRUE, 0, GL_WRITE_ONLY, GL_R32F);
+
+			s.set("amplitude", amplitudeDetail);
+			s.set("lacunarity", lacunarityDetail);
+			s.set("persistance", persistanceDetail);
+			s.set("time", time);
+			s.set("dimension", dimensions / 4);
+			s.set("typeOfNoise", 1);
+			s.set("numCells", numCellsDetail);
+			s.set("timeScale", timeScaleDetail);
+			s.set("useTimeScale", timeEffectDetail ? 1 : 0);
+			};
+		m_pipeline.push_back(std::move(detail));
 	}
 
 	void InitTextures() {
@@ -139,52 +100,6 @@ public:
 		glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_R, GL_REPEAT);
 	}
 
-	void InitShaders() {
-		m_noiseShader = CreateComputeShaderProgram(std::string(SHADER_DIR) + "Noise.comp");
-	}
-
-	void createDetail() {
-		glUseProgram(m_noiseShader);
-		glBindImageTexture(0, detailTex, 0, GL_TRUE, 0, GL_WRITE_ONLY, GL_R32F);
-
-		glUniform1f(amplitudeLoc, amplitudeDetail);
-		glUniform1f(lacunarityLoc, lacunarityDetail);
-		glUniform1f(persistanceLoc, persistanceDetail);
-		glUniform1i(dimensionLoc, dimensions/4);
-		glUniform1f(timeLoc, time);
-		glUniform1i(typeNoiseLoc, 1);
-		glUniform1f(numCellsLoc, numCellsDetail);
-		glUniform1f(timeScaleLoc, timeScaleDetail);
-		glUniform1i(timeCheckBoxLoc, timeEffectDetail ? 1 : 0);
-
-		int N = dimensions / (8 * 4);
-		glDispatchCompute(N, N, N);
-
-		glMemoryBarrier(GL_TEXTURE_FETCH_BARRIER_BIT);
-	}
-
-	void createNoise() {
-		glUseProgram(m_noiseShader);
-		glBindImageTexture(0, volumeTex, 0, GL_TRUE, 0, GL_WRITE_ONLY, GL_R32F);
-
-		glUniform1f(amplitudeLoc, amplitude);
-		glUniform1f(frequencyLoc, frequency);
-		glUniform1f(lacunarityLoc, lacunarity);
-		glUniform1f(persistanceLoc, persistance);
-		glUniform1i(octaveLoc, octaves);
-		glUniform1i(dimensionLoc,dimensions);
-		glUniform1f(timeLoc, time);
-		glUniform1i(typeNoiseLoc, 0);
-		glUniform1f(numCellsLoc, numCells);
-		glUniform1f(timeScaleLoc, timeScale);
-		glUniform1i(timeCheckBoxLoc, timeEffect ? 1 : 0);
-		
-		int N = dimensions / 8;
-		glDispatchCompute(N, N, N);
-
-		glMemoryBarrier(GL_TEXTURE_FETCH_BARRIER_BIT);
-	}
-
 	void onEnter() override {
 		std::string vertPath = std::string(SHADER_DIR) + "FluidRender.vert";
 		std::string fragPath = std::string(SHADER_DIR) + "FluidRender.frag";
@@ -194,7 +109,10 @@ public:
 		InitProgram();
 		glUseProgram(m_shader.ID);
 		float aspectRatio = float(m_width) / float(m_height);
-		m_camera.Init(70, aspectRatio, 0.1, 1000, m_shader.ID, dimensions);
+		m_camera.Init(70, aspectRatio, 0.1, 1000);
+		m_shader.set("boxMin", -dimensions / 2);
+		m_shader.set("boxMax", dimensions / 2);
+
 		glEnable(GL_DEPTH_TEST);
 		glEnable(GL_BLEND);
 		glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);   // src*alpha + dst*(1-alpha)
@@ -210,12 +128,9 @@ public:
 
 	void InitProgram() {
 		InitBuffers();
-		InitShaders();
-		InitNoiseUniforms();
-		InitShaderUniforms();
 		InitTextures();
-		createDetail();
-		createNoise();
+		buildPipeline();
+		runPipeline(m_pipeline);
 	}
 
 	void onExit() override {
@@ -226,33 +141,33 @@ public:
 
 	void update(float dt, frameInput& in) override {
 		
-		m_camera.Update(in);
+		m_camera.Update(dt, in);
 		time += dt;
 
 		
 	}
 
 	void updateUniforms() {
-		glUseProgram(m_shader.ID);
-		glUniform1f(detailScaleLoc, detailScale);
-		glUniform1f(detailStrengthLoc, detailStrength);
-		glUniform1f(densityScaleLoc, densityScale);
-		glUniform3f(lightDirLoc, lightDir.x, lightDir.y, lightDir.z);
-		glUniform3f(lightColorLoc, lightColor.x, lightColor.y, lightColor.z);
-		glUniform1f(lightStrengthLoc, lightStrength);
-		glUniform3f(skyColorLoc, skyColor.x, skyColor.y, skyColor.z);
-		glUniform1f(exposureLoc, exposure);
-		glUniform1f(shadowDensityLoc, shadowDensity);
-		glUniform3f(phaserGLoc, phaserG.x, phaserG.y, phaserG.z);
-		glUniform1f(nearShadowReachLoc, nearShadowReach);
-		glUniform1f(farShadowReachLoc, farShadowReach);
-		glUniform1f(stepSizeLoc, stepSize);
-		glUniform1i(maxStepsLoc, maxSteps);
-		glUniform1f(powderMixLoc, powderMix);
-		glUniform3f(AmbientColorTopLoc, ambientColorTop.x, ambientColorTop.y, ambientColorTop.z);
-		glUniform3f(AmbientColorBottomLoc, ambientColorBottom.x, ambientColorBottom.y, ambientColorBottom.z);
-		glUniform1i(useJitterLoc, useJitter ? 1 : 0);
-		glUniform1i(useDetailNoiseLoc, useDetailNoise ? 1 : 0);
+		m_shader.use();
+		m_shader.set("detailScale", detailScale);
+		m_shader.set("detailStrength", detailStrength);
+		m_shader.set("densityScale", densityScale);
+		m_shader.set("lightDir", lightDir);
+		m_shader.set("lightColor", lightColor);
+		m_shader.set("lightStrength", lightStrength);
+		m_shader.set("skyColor", skyColor);
+		m_shader.set("exposure",exposure);
+		m_shader.set("shadowDensity", shadowDensity);
+		m_shader.set("phaserG", phaserG);
+		m_shader.set("nearShadowReach", nearShadowReach);
+		m_shader.set("farShadowReach", farShadowReach);
+		m_shader.set("stepSize", stepSize);
+		m_shader.set("maxSteps", maxSteps);
+		m_shader.set("powderMix", powderMix);
+		m_shader.set("ambientColorTop", ambientColorTop);
+		m_shader.set("ambientColorBottom", ambientColorBottom);
+		m_shader.set("useJitter", useJitter ? 1 : 0);
+		m_shader.set("useDetailNoise", useDetailNoise ? 1 : 0);
 	}
 
 	void updateLightDirection() {
@@ -264,11 +179,10 @@ public:
 		glClearColor(0.2f, 0.3f, 0.8f, 1.0f);
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 		glMemoryBarrier(GL_TEXTURE_FETCH_BARRIER_BIT);
-		createNoise();
-		createDetail();
+		runPipeline(m_pipeline);
+		m_shader.use();
 		updateUniforms();
 		updateLightDirection();
-		glUseProgram(m_shader.ID);
 		glBindVertexArray(VAO);
 		glUniform1i(volumeLoc, 0);
 		glUniform1i(detailLoc, 1);
@@ -346,6 +260,8 @@ public:
 private:
 	int dimensions = 128;
 	Shader m_shader;
+	std::vector<ComputePass> m_pipeline;
+	enum PassIndex { PassBase = 0, PaseDetail = 1 };
 	FluidCamera m_camera;
 	unsigned int VAO;
 	int m_width, m_height;
@@ -357,9 +273,6 @@ private:
 	GLuint volumeLoc, detailLoc;
 
 	//Noise variables
-	GLuint m_noiseShader, m_detailShader;
-	GLuint amplitudeLoc, frequencyLoc, persistanceLoc, lacunarityLoc, octaveLoc, dimensionLoc, timeLoc, typeNoiseLoc, numCellsLoc, timeScaleLoc, timeCheckBoxLoc;
-
 	float amplitude = 1.0f;
 	float frequency = 0.041f;
 	float persistance = 0.5f;
@@ -377,10 +290,6 @@ private:
 	float timeScaleDetail = 1.0f;
 
 	//Shader variables
-	GLuint detailScaleLoc, detailStrengthLoc, densityScaleLoc, lightDirLoc, lightColorLoc, lightStrengthLoc, skyColorLoc,
-		exposureLoc, shadowDensityLoc, phaserGLoc, nearShadowReachLoc, farShadowReachLoc, stepSizeLoc, maxStepsLoc, powderMixLoc,
-		AmbientColorTopLoc, AmbientColorBottomLoc, useJitterLoc, useDetailNoiseLoc;
-
 	float azimuth = 63.4f, elevation = 27.6f;
 
 	float detailScale = 4.0f;

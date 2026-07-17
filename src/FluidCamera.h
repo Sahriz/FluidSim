@@ -1,38 +1,40 @@
 #pragma once
 
+#include <glad/glad.h>
 #include "glm.hpp"
 #include "gtc/matrix_transform.hpp"
-#include "gtc/type_ptr.hpp"
 #include "keyHandler.h"
+
+struct CameraBlock {
+	glm::mat4 view;
+	glm::mat4 projection;
+	glm::mat4 viewProj;
+	glm::mat4 invViewProjMat;
+	glm::vec4 camPos;
+};
 
 class FluidCamera {
 public:
 	FluidCamera() = default;
+	~FluidCamera() { if (m_ubo) glDeleteBuffers(1, &m_ubo); }
+	FluidCamera(const FluidCamera&) = delete;
+	FluidCamera& operator=(const FluidCamera&) = delete;
 
-	void Init(float fov, float aspectRatio, float nearPlane, float farPlane, GLuint ID, int dimensions) {
-		perspectiveMat = glm::perspective(glm::radians(fov), aspectRatio, nearPlane, farPlane);
-		perpectiveLoc = glGetUniformLocation(ID, "projection");
-		glUniformMatrix4fv(perpectiveLoc, 1, GL_FALSE, glm::value_ptr(perspectiveMat));
+	void Init(float fov, float aspectRatio, float nearPlane, float farPlane) {
+		m_fov = fov; m_near = nearPlane; m_far = farPlane;
+		m_proj = glm::perspective(glm::radians(m_fov), aspectRatio, m_near, m_far);
 
-		inverseViewProjLoc = glGetUniformLocation(ID, "invViewProjMat");
-		camPosLoc = glGetUniformLocation(ID, "camPos");
-		boxMinLoc = glGetUniformLocation(ID, "boxMin");
-		boxMaxLoc = glGetUniformLocation(ID, "boxMax");
+		glCreateBuffers(1, &m_ubo);
+		glNamedBufferStorage(m_ubo, sizeof(CameraBlock), nullptr, GL_DYNAMIC_STORAGE_BIT);
+		glBindBufferBase(GL_UNIFORM_BUFFER, 0, m_ubo);
 
-		glUniform1i(boxMinLoc, -dimensions / 2);
-		glUniform1i(boxMaxLoc, dimensions / 2);
-		
-
-		viewLoc = glGetUniformLocation(ID, "view");
-		computeView();
+		upload();
 	}
 
-	void Update(frameInput& fInput) {
-		m_yaw += 0.005 * -fInput.dx;
-		m_pitch += 0.005 * fInput.dy;
-
-		if(m_pitch > 1.5f) m_pitch = 1.5f;
-		if (m_pitch < -1.5f) m_pitch = -1.5f;
+	void Update(float dt, frameInput& in) {
+		m_yaw += 0.005 * float(-in.dx);
+		m_pitch += 0.005 * float(in.dy);
+		m_pitch = glm::clamp(m_pitch, -1.5f, 1.5f);
 
 		glm::vec3 forward;
 		forward.x = cos(m_pitch) * sin(m_yaw);
@@ -40,49 +42,37 @@ public:
 		forward.z = cos(m_pitch) * cos(m_yaw);
 		forward = glm::normalize(forward);
 
-		glm::vec3 worldUp = glm::vec3(0.0, 1.0, 0.0);
-		glm::vec3 right = glm::normalize(glm::cross(forward, worldUp));
+		glm::vec3 right = glm::normalize(glm::cross(forward, glm::vec3(0,1,0)));
 		glm::vec3 up = glm::normalize(glm::cross(right, forward));
 
-		float moveSpeed = 0.5f;
+		m_eye += (right * in.inputDirection.x
+				+ up * in.inputDirection.y
+				+ forward * in.inputDirection.z) * m_moveSpeed * dt;
 
-		eye += right * fInput.inputDirection.x * moveSpeed;
-		eye += up * fInput.inputDirection.y * moveSpeed;
-		eye += forward * fInput.inputDirection.z * moveSpeed;
-
-		viewMat = glm::lookAt(eye, eye + forward, worldUp);
-		glUniformMatrix4fv(viewLoc, 1, GL_FALSE, glm::value_ptr(viewMat));
-
-		glUniform3fv(camPosLoc, 1, glm::value_ptr(eye));
-
-		inverseViewProjMat = glm::inverse(perspectiveMat * viewMat);
-		glUniformMatrix4fv(inverseViewProjLoc, 1, GL_FALSE, glm::value_ptr(inverseViewProjMat));
-		
+		m_view = glm::lookAt(m_eye, m_eye + forward, glm::vec3(0,1,0));
+		upload();
 	}
 
-	void computeView() {
-		
-
-		glm::vec3 forward(cos(m_pitch) * sin(m_yaw), sin(m_pitch), cos(m_pitch) * cos(m_yaw));
-
-		viewMat = glm::lookAt(eye, eye + glm::normalize(forward), glm::vec3(0, 1, 0));
-		glUniformMatrix4fv(viewLoc, 1, GL_FALSE, glm::value_ptr(viewMat));
+	void setAspect(float aspect) {
+		m_proj = glm::perspective(glm::radians(m_fov), aspect, m_near, m_far);
+		upload();
 	}
 
-	glm::mat4 perspectiveMat;
-	glm::mat4 viewMat;
-	glm::mat4 inverseViewProjMat;
-
-	GLuint inverseViewProjLoc;
-	GLuint camPosLoc;
-	GLuint boxMinLoc, boxMaxLoc;
-
-	GLint perpectiveLoc;
-	GLint viewLoc;
 private:
-	glm::vec3 eye = glm::vec3(0.0f,25.0f, -100.0f);
-	float m_yaw = 0.0f;
-	float m_pitch = 0.0f;
-	float m_radius = 2.0f;
-	glm::vec3 m_target = glm::vec3(0.0f);
+	void upload() {
+		CameraBlock b;
+		b.view = m_view;
+		b.projection = m_proj;
+		b.viewProj = m_proj * m_view;
+		b.invViewProjMat = glm::inverse(b.viewProj);
+		b.camPos = glm::vec4(m_eye, 1.0f);
+		glNamedBufferSubData(m_ubo, 0, sizeof(b), &b);
+	}
+	
+	GLuint m_ubo = 0;
+	glm::mat4 m_view{ 1.0f }, m_proj{ 1.0f };
+	glm::vec3 m_eye{ 0.0f, 25.0f, -100.0f };
+	float m_yaw = 0.0f, m_pitch = 0.0f;
+	float m_fov = 70.0f, m_near = 0.1f, m_far = 1000.0f;
+	float m_moveSpeed = 300.0f;
 };

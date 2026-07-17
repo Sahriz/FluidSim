@@ -52,6 +52,7 @@ set(HEADER_FILES
     src/Window.h
     src/TerrainScene.h
     src/TerrainCamera.h
+    src/ComputePass.h
 )
 
 set(SOURCE_FILES

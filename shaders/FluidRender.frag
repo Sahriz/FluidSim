@@ -1,10 +1,16 @@
-#version 430 core
+#version 460 core
+
+layout(std140, binding = 0) uniform Camera{
+    mat4 view;
+    mat4 projection;
+    mat4 viewProj;
+    mat4 invViewProjMat;
+    vec4 camPos;
+};
 
 uniform sampler3D volume;
 uniform sampler3D detailNoise;
 
-uniform vec3 camPos;
-uniform mat4 invViewProjMat;
 uniform int boxMin;
 uniform int boxMax;
 
@@ -102,8 +108,8 @@ void main() {
     vec4 worldPos = invViewProjMat * vec4(ndc, 1.0, 1.0);
     worldPos /= worldPos.w;
 
-    vec3 rayOrigin = camPos;
-    vec3 rayDir = normalize(worldPos.xyz - camPos);
+    vec3 rayOrigin = camPos.xyz;
+    vec3 rayDir = normalize(worldPos.xyz - camPos.xyz);
 
     vec3 t1 = (vec3(boxMin) - rayOrigin) / rayDir;
     vec3 t2 = (vec3(boxMax) - rayOrigin) / rayDir;
