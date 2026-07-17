@@ -23,14 +23,24 @@ App::~App() {
 }
 
 void App::drawCommonUI() {
+    const ImGuiViewport* vp = ImGui::GetMainViewport();
+    const float panelWidth = 240.0f;
+    ImGui::SetNextWindowPos(vp->WorkPos, ImGuiCond_Always);
+    ImGui::SetNextWindowSize(ImVec2(panelWidth, vp->WorkSize.y), ImGuiCond_Always);
+    ImGuiWindowFlags flags = ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoSavedSettings;
+
     const char* title = m_currentScene->m_title.c_str();
-    ImGui::Begin(title);
+    ImGui::Begin(title, nullptr, flags);
+    ImGui::PushItemWidth(-140.0f);
     float fps = ImGui::GetIO().Framerate;
     ImGui::Text("%.1f FPS (%.2f ms/frame)", fps, 1000.0f / fps);
     const char* sceneNames[] = {"CubeScene", "FluidSim", "TerrainScene"};
     if (ImGui::Combo("Scene", &m_sceneIndex, sceneNames, IM_ARRAYSIZE(sceneNames))) {
         switchScene(static_cast<SceneId>(m_sceneIndex));
     }
+    ImGui::Separator();
+    m_currentScene->drawUI();
+    ImGui::PopItemWidth();
     ImGui::End();
 }
 
@@ -52,7 +62,7 @@ void App::run() {
         m_currentScene->render();
         
         drawCommonUI();
-        m_currentScene->drawUI();
+        
 
         ImGui::Render();
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
