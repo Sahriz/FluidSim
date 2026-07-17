@@ -20,7 +20,8 @@ uniform vec3 skyColor;
 uniform float exposure;
 uniform float shadowDensity;
 uniform vec3 phaserG;
-uniform float shadowReach;
+uniform float nearShadowReach;
+uniform float farShadowReach;
 uniform float stepSize;
 uniform int maxSteps;
 uniform float powderMix;
@@ -32,6 +33,7 @@ uniform int useDetailNoise;
 
 in vec2 uv;
 out vec4 FragColor;
+
 
 
 vec3 finalizeColor(vec3 linear){
@@ -46,6 +48,21 @@ float hg(float cosTheta, float g) {
     return (1.0 - g2) / (4.0 * 3.14159265 * pow(base, 1.5));
 }
 
+vec3 toUvw(vec3 pos){
+    return (pos - vec3(boxMin)) / (vec3(boxMax) - vec3(boxMin));
+}
+
+float scatter(float tau, float cosTheta){
+    float a = 1.0, b = 1.0, c = 1.0;
+    float sum = 0.0;
+    for(int o = 0; o < 3; o++){
+        float ph = mix(hg(cosTheta, phaserG.x * c), hg(cosTheta, phaserG.y * c), phaserG.z);
+        sum += b * exp(-tau * a) * ph;
+        a *= 0.25; b *= 0.7; c *= 0.5;
+    }
+    return sum;
+}
+
 float sampleDensity(vec3 pos) {
     vec3 uvw = (pos - vec3(boxMin)) / (vec3(boxMax) - vec3(boxMin));
     float density = texture(volume, uvw).r;                        // raw, [0,1]
@@ -54,14 +71,28 @@ float sampleDensity(vec3 pos) {
     return density * densityScale;                                 // scale LAST, once
 }
 
+bool outsideBox(vec3 pos){
+    return any(lessThan(pos, vec3(boxMin))) || any(greaterThan(pos,vec3(boxMax)));
+}
+
 float lightMarch(vec3 pos) {
-    float lightStepSize = shadowReach/6.0f;  // step size along the light ray
     float opticalDepth = 0.0;
-    for (int i = 0; i < 6; i++) {       // 4-6 steps is plenty
-        pos += lightDir * lightStepSize;                              // step along -lightDir (or toward light)s
-        if((any(lessThan(pos, vec3(boxMin))) || any(greaterThan(pos,vec3(boxMax))))){ break; }
-        opticalDepth += sampleDensity(pos) * lightStepSize;  // accumulate density along the light ray
-        if(opticalDepth * shadowDensity > 6.0) { break; }
+
+    float stepN = nearShadowReach/ 3.0f;  // step size along the light ray
+    
+    for (int i = 0; i < 3; i++) {       // 4-6 steps is plenty
+        pos += lightDir * stepN;                              // step along -lightDir (or toward light)s
+        
+        if(outsideBox(pos)){ return opticalDepth; }
+        opticalDepth += sampleDensity(pos) * stepN;  // accumulate density along the light ray
+    }
+
+    float stepF = (farShadowReach - nearShadowReach) / 4.0;
+    for(int i = 0; i < 4; i ++){
+        pos += lightDir * stepF;
+        if(outsideBox(pos)) break;
+        opticalDepth += texture(volume, toUvw(pos)).r * densityScale * stepF;
+        if(opticalDepth * shadowDensity > 6.0) break;
     }
     return opticalDepth;       // 1 = fully sunlit, 0 = deep shadow
 }
@@ -101,18 +132,20 @@ void main() {
 
         float t = tEnter + (float(i) + jitter) * step;   // replaces the fixed +0.5
         vec3 pos  = rayOrigin + t * rayDir;
-        vec3 uvw  = (pos - vec3(boxMin)) / (vec3(boxMax) - vec3(boxMin)); 
+        vec3 uvw  = toUvw(pos); 
         
         float density = sampleDensity(pos);
         if(density > 0.01 && transmittance > 0.05) {
             float tau = lightMarch(pos) * shadowDensity;   // shadowing
-            float sunTerm = exp(-tau) + 0.35 * exp(-tau * 0.25) + 0.12 * exp(-tau * 0.06);
+            float sunTerm = scatter(tau, cosTheta);
 
             float powder = 1.0 - exp(-2.0 * tau);  // Beer-Lambert law
-            sunTerm *= mix(1.0, powder, powderMix);  // add some powdery scattering to the sun
+            float litView = clamp(-cosTheta * 0.5 + 0.5, 0.0, 1.0);
 
-            vec3 ambient = mix(vec3(0.08, 0.10, 0.14), vec3(0.22, 0.30, 0.45), uvw.y);   
-            vec3 sampleColor = lightColor * lightStrength * sunTerm * phase + ambient;
+            sunTerm *= mix(1.0, powder, powderMix * litView);  // add some powdery scattering to the sun
+
+            vec3 ambient = mix(ambientColorBottom, ambientColorTop, uvw.y);   
+            vec3 sampleColor = lightColor * lightStrength * sunTerm + ambient;
 
             float slabTrans  = exp(-density * step);      // this slab's own opacity
             color           += sampleColor * (1.0 - slabTrans) * transmittance;

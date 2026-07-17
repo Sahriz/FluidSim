@@ -104,7 +104,8 @@ public:
 		exposureLoc = glGetUniformLocation(m_shader.ID, "exposure");
 		shadowDensityLoc = glGetUniformLocation(m_shader.ID, "shadowDensity");
 		phaserGLoc = glGetUniformLocation(m_shader.ID, "phaserG");
-		shadowReachLoc = glGetUniformLocation(m_shader.ID, "shadowReach");
+		nearShadowReachLoc = glGetUniformLocation(m_shader.ID, "nearShadowReach");
+		farShadowReachLoc = glGetUniformLocation(m_shader.ID, "farShadowReach");
 		stepSizeLoc = glGetUniformLocation(m_shader.ID, "stepSize");
 		maxStepsLoc = glGetUniformLocation(m_shader.ID, "maxSteps");
 		powderMixLoc = glGetUniformLocation(m_shader.ID, "powderMix");
@@ -243,7 +244,8 @@ public:
 		glUniform1f(exposureLoc, exposure);
 		glUniform1f(shadowDensityLoc, shadowDensity);
 		glUniform3f(phaserGLoc, phaserG.x, phaserG.y, phaserG.z);
-		glUniform1f(shadowReachLoc, shadowReach);
+		glUniform1f(nearShadowReachLoc, nearShadowReach);
+		glUniform1f(farShadowReachLoc, farShadowReach);
 		glUniform1f(stepSizeLoc, stepSize);
 		glUniform1i(maxStepsLoc, maxSteps);
 		glUniform1f(powderMixLoc, powderMix);
@@ -280,64 +282,65 @@ public:
 
 	void drawUI() override {
 		//First section
+		if (ImGui::CollapsingHeader("Cloud Settings", ImGuiTreeNodeFlags_DefaultOpen)) {
+			if (ImGui::CollapsingHeader("Density Noise Settings", ImGuiTreeNodeFlags_DefaultOpen)) {
+				ImGui::SliderFloat("Amplitude", &amplitude, 0.0f, 5.0f);
+				ImGui::SliderFloat("Frequency", &frequency, 0.0f, 0.1f);
+				ImGui::SliderFloat("Persistance", &persistance, 0.0f, 1.0f);
+				ImGui::SliderFloat("Lacunarity", &lacunarity, 0.0f, 5.0f);
+				ImGui::SliderInt("Octaves", &octaves, 1, 10);
+				ImGui::SliderFloat("Number of Cells", &numCells, 2.0f, 64.0f);
+				ImGui::SliderFloat("Time Scale", &timeScale, 0.0f, 25.0f);
+				ImGui::Checkbox("Time Effect", &timeEffect);
+			}
 		
-		if (ImGui::CollapsingHeader("Density Noise Settings", ImGuiTreeNodeFlags_DefaultOpen)) {
-			ImGui::SliderFloat("Amplitude", &amplitude, 0.0f, 5.0f);
-			ImGui::SliderFloat("Frequency", &frequency, 0.0f, 0.1f);
-			ImGui::SliderFloat("Persistance", &persistance, 0.0f, 1.0f);
-			ImGui::SliderFloat("Lacunarity", &lacunarity, 0.0f, 5.0f);
-			ImGui::SliderInt("Octaves", &octaves, 1, 10);
-			ImGui::SliderFloat("Number of Cells", &numCells, 2.0f, 64.0f);
-			ImGui::SliderFloat("Time Scale", &timeScale, 0.0f, 25.0f);
-			ImGui::Checkbox("Time Effect", &timeEffect);
+			ImGui::Separator();
+		
+			//Second section
+			if (ImGui::CollapsingHeader("Detail Noise Settings", ImGuiTreeNodeFlags_DefaultOpen)) {
+				ImGui::SliderFloat("Detail Amplitude", &amplitudeDetail, 16, 256);
+				ImGui::SliderFloat("Detail Persistance", &persistanceDetail, 0.0f, 1.0f);
+				ImGui::SliderFloat("Detail Lacunarity", &lacunarityDetail, 0.0f, 5.0f);
+				ImGui::SliderFloat("Detail Number of Cells", &numCellsDetail, 2.0f, 64.0f);
+				ImGui::SliderFloat("Detail Time Scale", &timeScaleDetail, 0.0f, 25.0f);
+				ImGui::Checkbox("Detail Time Effect", &timeEffectDetail);
+			}
+		
+			ImGui::Spacing();
+			ImGuiStyle& style = ImGui::GetStyle();
+		
+			if (ImGui::CollapsingHeader("Render settings", ImGuiTreeNodeFlags_DefaultOpen)) {
+				float w1 = (ImGui::CalcItemWidth() - style.ItemInnerSpacing.x) / 2.0f;
+				float w2 = (ImGui::CalcItemWidth() - style.ItemInnerSpacing.x) / 3.0f;
+				ImGui::SliderFloat("Detail Scale", &detailScale, 1.0f,16.0f);
+				ImGui::SliderFloat("Detail Strength", &detailStrength, 0.0f, 4.0f);
+				ImGui::SliderFloat("Density Scale", &densityScale, 0.0f, 5.0f);
+				ImGui::PushItemWidth(w1);
+				ImGui::SliderFloat("Sun Azimuth", &azimuth, 0.0f, 360.0f);
+				ImGui::SameLine(0.0f, style.ItemInnerSpacing.x);
+				ImGui::SliderFloat("Sun elevation", &elevation, -10.0f, 90.0f);
+				ImGui::PopItemWidth();
+				ImGui::SliderFloat3("Light Color", &lightColor.x, 0.0f, 1.0f);
+				ImGui::SliderFloat("Light Strength", &lightStrength, 1.0f, 50.0f);
+				ImGui::SliderFloat3("Sky Color", &skyColor.x, 0.0f, 1.0f);
+				ImGui::SliderFloat("Exposure", &exposure, 0.1f, 1.0f);
+				ImGui::SliderFloat("ShadowDensity", &shadowDensity, 0.1f, 1.0f);
+				ImGui::SliderFloat("Near Shadow Reach", &nearShadowReach, 0.25f, 4.0f);
+				ImGui::SliderFloat("Far Shadow Reach", &farShadowReach, 4.0f, 128.0f);
+				ImGui::PushItemWidth(w2);
+				ImGui::SliderFloat("forward", &phaserG.x, 0.0f, 0.9f);
+				ImGui::SameLine(0.0f, style.ItemInnerSpacing.x);
+				ImGui::SliderFloat("back", &phaserG.y, -0.9f, 0.0f);
+				ImGui::SameLine(0.0f, style.ItemInnerSpacing.x);
+				ImGui::SliderFloat("mix", &phaserG.z, 0.0f, 1.0f);
+				ImGui::PopItemWidth();
+				ImGui::SliderFloat("Step size", &stepSize, 0.25f, 4.0f);
+				ImGui::SliderInt("Max steps", &maxSteps, 32, 512);
+				ImGui::SliderFloat("Powder mix", &powderMix, 0.0f, 1.0f);
+				ImGui::Checkbox("Use Jitter", &useJitter);
+				ImGui::Checkbox("Use Detail Noise", &useDetailNoise);
+			}
 		}
-		
-		ImGui::Separator();
-		
-		//Second section
-		if (ImGui::CollapsingHeader("Detail Noise Settings", ImGuiTreeNodeFlags_DefaultOpen)) {
-			ImGui::SliderFloat("Detail Amplitude", &amplitudeDetail, 16, 256);
-			ImGui::SliderFloat("Detail Persistance", &persistanceDetail, 0.0f, 1.0f);
-			ImGui::SliderFloat("Detail Lacunarity", &lacunarityDetail, 0.0f, 5.0f);
-			ImGui::SliderFloat("Detail Number of Cells", &numCellsDetail, 2.0f, 64.0f);
-			ImGui::SliderFloat("Detail Time Scale", &timeScaleDetail, 0.0f, 25.0f);
-			ImGui::Checkbox("Detail Time Effect", &timeEffectDetail);
-		}
-		
-		ImGui::Spacing();
-		ImGuiStyle& style = ImGui::GetStyle();
-		
-		if (ImGui::CollapsingHeader("Render settings", ImGuiTreeNodeFlags_DefaultOpen)) {
-			float w1 = (ImGui::CalcItemWidth() - style.ItemInnerSpacing.x) / 2.0f;
-			float w2 = (ImGui::CalcItemWidth() - style.ItemInnerSpacing.x) / 3.0f;
-			ImGui::SliderFloat("Detail Scale", &detailScale, 1.0f,16.0f);
-			ImGui::SliderFloat("Detail Strength", &detailStrength, 0.0f, 4.0f);
-			ImGui::SliderFloat("Density Scale", &densityScale, 0.0f, 5.0f);
-			ImGui::PushItemWidth(w1);
-			ImGui::SliderFloat("Sun Azimuth", &azimuth, 0.0f, 360.0f);
-			ImGui::SameLine(0.0f, style.ItemInnerSpacing.x);
-			ImGui::SliderFloat("Sun elevation", &elevation, -10.0f, 90.0f);
-			ImGui::PopItemWidth();
-			ImGui::SliderFloat3("Light Color", &lightColor.x, 0.0f, 1.0f);
-			ImGui::SliderFloat("Light Strength", &lightStrength, 1.0f, 50.0f);
-			ImGui::SliderFloat3("Sky Color", &skyColor.x, 0.0f, 1.0f);
-			ImGui::SliderFloat("Exposure", &exposure, 0.1f, 1.0f);
-			ImGui::SliderFloat("ShadowDensity", &shadowDensity, 0.1f, 1.0f);
-			ImGui::SliderFloat("Shadow Reach", &shadowReach, 5.0f, 128.0f);
-			ImGui::PushItemWidth(w2);
-			ImGui::SliderFloat("forward", &phaserG.x, 0.0f, 0.9f);
-			ImGui::SameLine(0.0f, style.ItemInnerSpacing.x);
-			ImGui::SliderFloat("back", &phaserG.y, -0.9f, 0.0f);
-			ImGui::SameLine(0.0f, style.ItemInnerSpacing.x);
-			ImGui::SliderFloat("mix", &phaserG.z, 0.0f, 1.0f);
-			ImGui::PopItemWidth();
-			ImGui::SliderFloat("Step size", &stepSize, 0.25f, 4.0f);
-			ImGui::SliderInt("Max steps", &maxSteps, 32, 512);
-			ImGui::SliderFloat("Powder mix", &powderMix, 0.0f, 1.0f);
-			ImGui::Checkbox("Use Jitter", &useJitter);
-			ImGui::Checkbox("Use Detail Noise", &useDetailNoise);
-		}
-
 	}
 
 private:
@@ -358,7 +361,7 @@ private:
 	GLuint amplitudeLoc, frequencyLoc, persistanceLoc, lacunarityLoc, octaveLoc, dimensionLoc, timeLoc, typeNoiseLoc, numCellsLoc, timeScaleLoc, timeCheckBoxLoc;
 
 	float amplitude = 1.0f;
-	float frequency = 0.008f;
+	float frequency = 0.041f;
 	float persistance = 0.5f;
 	float lacunarity = 2.0f;
 	int octaves = 6;
@@ -375,14 +378,14 @@ private:
 
 	//Shader variables
 	GLuint detailScaleLoc, detailStrengthLoc, densityScaleLoc, lightDirLoc, lightColorLoc, lightStrengthLoc, skyColorLoc,
-		exposureLoc, shadowDensityLoc, phaserGLoc, shadowReachLoc, stepSizeLoc, maxStepsLoc, powderMixLoc,
+		exposureLoc, shadowDensityLoc, phaserGLoc, nearShadowReachLoc, farShadowReachLoc, stepSizeLoc, maxStepsLoc, powderMixLoc,
 		AmbientColorTopLoc, AmbientColorBottomLoc, useJitterLoc, useDetailNoiseLoc;
 
 	float azimuth = 63.4f, elevation = 27.6f;
 
 	float detailScale = 4.0f;
 	float detailStrength = 2.0f;
-	float densityScale = 1.0f;
+	float densityScale = 0.45f;
 	glm::vec3 lightDir = glm::vec3(0.0f,1.0f,0.0f);
 	glm::vec3 lightColor = glm::vec3(0.9f, 0.65f, 0.40f);	
 	float lightStrength = 20.0f;
@@ -390,7 +393,8 @@ private:
 	float exposure = 0.9f;
 	float shadowDensity = 0.5f;
 	glm::vec3 phaserG = glm::vec3(0.6f, -0.2f, 0.3f);
-	float shadowReach = 15.0f;
+	float nearShadowReach = 0.5f;
+	float farShadowReach = 20.0f;
 	float stepSize = 0.5f;
 	int maxSteps = 256;
 	float powderMix = 0.5f;
