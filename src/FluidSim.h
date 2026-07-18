@@ -101,22 +101,32 @@ public:
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+
+		glCreateFramebuffers(1, &m_fbo);
+		glNamedFramebufferTexture(m_fbo, GL_COLOR_ATTACHMENT0, frameTex, 0);
+		if (glCheckNamedFramebufferStatus(m_fbo, GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
+			std::cerr << "framebuffer incomplete\n";
+		}
 	}
 
 	void onEnter() override {
-		std::string vertPath = std::string(SHADER_DIR) + "FluidRender.vert";
-		std::string fragPath = std::string(SHADER_DIR) + "FluidRender.frag";
+		std::string cloudVertPath = std::string(SHADER_DIR) + "Fullscreen.vert";
+		std::string cloudFragPath = std::string(SHADER_DIR) + "Cloud.frag";
 
-		m_shader.init(vertPath, fragPath);
+		std::string compositeVertPath = std::string(SHADER_DIR) + "Fullscreen.vert";
+		std::string compositeFragPath = std::string(SHADER_DIR) + "Composite.frag";
+
+		m_shader.init(cloudVertPath, cloudFragPath);
+		m_compositeShader.init(compositeVertPath, compositeFragPath);
 
 		InitProgram();
-		glUseProgram(m_shader.ID);
+		m_shader.use();
 		float aspectRatio = float(m_width) / float(m_height);
 		m_camera.Init(70, aspectRatio, 0.1, 1000);
 		m_shader.set("boxMin", -dimensions / 2);
 		m_shader.set("boxMax", dimensions / 2);
 
-		glEnable(GL_DEPTH_TEST);
+		glDisable(GL_DEPTH_TEST);
 		glEnable(GL_BLEND);
 		glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);   // src*alpha + dst*(1-alpha)
 	}
@@ -141,6 +151,7 @@ public:
 		glDeleteTextures(1, &volumeTex);
 		glDeleteTextures(1, &detailTex);
 		glDeleteTextures(1, &frameTex);
+		glDeleteFramebuffers(1, &m_fbo);
 	}
 
 	void onResize(int width, int height) override {
@@ -173,7 +184,6 @@ public:
 		m_shader.set("lightColor", lightColor);
 		m_shader.set("lightStrength", lightStrength);
 		m_shader.set("skyColor", skyColor);
-		m_shader.set("exposure",exposure);
 		m_shader.set("shadowDensity", shadowDensity);
 		m_shader.set("phaserG", phaserG);
 		m_shader.set("nearShadowReach", nearShadowReach);
@@ -194,6 +204,7 @@ public:
 
 	void render() override {
 		glClearColor(0.2f, 0.3f, 0.8f, 1.0f);
+		glBindFramebuffer(GL_FRAMEBUFFER, m_fbo);
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 		glMemoryBarrier(GL_TEXTURE_FETCH_BARRIER_BIT);
 		m_pipeline[PassBase].continuous = timeEffect;
@@ -209,7 +220,13 @@ public:
 		glBindTexture(GL_TEXTURE_3D, volumeTex);
 		glActiveTexture(GL_TEXTURE1);
 		glBindTexture(GL_TEXTURE_3D, detailTex);
+		glDrawArrays(GL_TRIANGLES, 0, 3);
 
+		glBindFramebuffer(GL_FRAMEBUFFER, 0);
+		m_compositeShader.use();
+		m_compositeShader.set("frame", 0);
+		m_compositeShader.set("exposure", exposure);
+		glBindTextureUnit(0, frameTex);
 		glDrawArrays(GL_TRIANGLES, 0, 3);
 	}
 
@@ -284,6 +301,7 @@ public:
 private:
 	int dimensions = 128;
 	Shader m_shader;
+	Shader m_compositeShader;
 	std::vector<ComputePass> m_pipeline;
 	enum PassIndex { PassBase = 0, PassDetail = 1 };
 	FluidCamera m_camera;
@@ -295,7 +313,8 @@ private:
 	GLuint volumeTex;
 	GLuint detailTex;
 	GLuint frameTex;
-	GLuint volumeLoc, detailLoc, frameLoc;
+	GLuint volumeLoc, detailLoc;
+	GLuint m_fbo;
 
 	//Noise variables
 	float amplitude = 1.0f;

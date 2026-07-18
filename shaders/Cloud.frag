@@ -23,7 +23,6 @@ uniform vec3 lightColor;
 uniform float lightStrength;
 uniform vec3 skyColor;
 
-uniform float exposure;
 uniform float shadowDensity;
 uniform vec3 phaserG;
 uniform float nearShadowReach;
@@ -39,14 +38,6 @@ uniform int useDetailNoise;
 
 in vec2 uv;
 out vec4 FragColor;
-
-
-
-vec3 finalizeColor(vec3 linear){
-    vec3 finalColor = vec3(1.0) - exp(-linear * exposure);  // convert from optical depth to color
-    finalColor = pow(finalColor, vec3(1.0 / 2.2));
-    return finalColor;
-}
 
 float hg(float cosTheta, float g) {
     float g2 = g * g;
@@ -119,7 +110,7 @@ void main() {
     tEnter = max(tEnter, 0.0);
     float tExit  = min(min(tbig.x, tbig.y), tbig.z);
 
-    if(tExit < 0.0 || tEnter > tExit) { FragColor = vec4(finalizeColor(skyColor),1.0); return; }
+    if(tExit < 0.0 || tEnter > tExit) { FragColor = vec4(skyColor,1.0); return; }
     float step = stepSize;
     int numSteps = int((tExit - tEnter) / step) + 1;  // limit to 100 steps for performance
     if(numSteps > maxSteps){
@@ -160,7 +151,7 @@ void main() {
         }  
         if(transmittance < 0.01) break;  // early exit if almost opaque
     }
-    vec3 finalColor = finalizeColor(color + skyColor * transmittance);
     
-    FragColor = vec4(finalColor, 1.0);
+    
+    FragColor = vec4(color + skyColor * transmittance, 1.0);
 }
