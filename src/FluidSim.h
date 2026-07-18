@@ -28,13 +28,10 @@ public:
 
 		ComputePass base;
 		base.name = "Cloud base";
-		base.shader.init(std::string(SHADER_DIR) + "Noise.comp");
+		base.shader.init(std::string(SHADER_DIR) + "CloudBase.comp");
 		base.groups = glm::ivec3(dimensions / 8);
 		base.barrierAfter = GL_TEXTURE_FETCH_BARRIER_BIT;
-
-		base.shader.set("typeOfNoise", 0);
 		
-		base.shader.set("dimension", dimensions);
 		base.bind = [this](Shader& s, int) {
 			glBindImageTexture(0, volumeTex, 0, GL_TRUE, 0, GL_WRITE_ONLY, GL_R32F);
 
@@ -45,7 +42,6 @@ public:
 			s.set("octaves", octaves);
 			s.set("time", time);
 			s.set("dimension", dimensions);
-			s.set("typeOfNoise", 0);
 			s.set("numCells", numCells);
 			s.set("timeScale", timeScale);
 			s.set("useTimeScale", timeEffect ? 1 : 0);
@@ -55,20 +51,18 @@ public:
 
 		ComputePass detail;
 		detail.name = "Cloud detail";
-		detail.shader.init(std::string(SHADER_DIR) + "Noise.comp");
+		detail.shader.init(std::string(SHADER_DIR) + "CloudDetail.comp");
 		detail.groups = glm::ivec3(dimensions / (4 * 8));
 		detail.barrierAfter = GL_TEXTURE_FETCH_BARRIER_BIT;
-		detail.shader.set("typeOfNoise", 1);
-		detail.shader.set("dimension", dimensions / 4);
 		detail.bind = [this](Shader& s, int) {
 			glBindImageTexture(0, detailTex, 0, GL_TRUE, 0, GL_WRITE_ONLY, GL_R32F);
 
 			s.set("amplitude", amplitudeDetail);
 			s.set("lacunarity", lacunarityDetail);
 			s.set("persistance", persistanceDetail);
+			s.set("octaves", octavesDetail);
 			s.set("time", time);
 			s.set("dimension", dimensions / 4);
-			s.set("typeOfNoise", 1);
 			s.set("numCells", numCellsDetail);
 			s.set("timeScale", timeScaleDetail);
 			s.set("useTimeScale", timeEffectDetail ? 1 : 0);
@@ -221,6 +215,7 @@ public:
 				detailPass.dirty |= ImGui::SliderFloat("Detail Amplitude", &amplitudeDetail, 16, 256);
 				detailPass.dirty |= ImGui::SliderFloat("Detail Persistance", &persistanceDetail, 0.0f, 1.0f);
 				detailPass.dirty |= ImGui::SliderFloat("Detail Lacunarity", &lacunarityDetail, 0.0f, 5.0f);
+				detailPass.dirty |= ImGui::SliderInt("Detail Octaves", &octavesDetail, 1, 10);
 				detailPass.dirty |= ImGui::SliderFloat("Detail Number of Cells", &numCellsDetail, 2.0f, 64.0f);
 				detailPass.dirty |= ImGui::SliderFloat("Detail Time Scale", &timeScaleDetail, 0.0f, 25.0f);
 				detailPass.dirty |= ImGui::Checkbox("Detail Time Effect", &timeEffectDetail);
@@ -291,6 +286,7 @@ private:
 	float amplitudeDetail = 1.0f;
 	float persistanceDetail = 0.5f;
 	float lacunarityDetail = 2.0f;
+	int octavesDetail = 3;
 	float numCellsDetail = 4;
 	bool timeEffectDetail = true;
 	float timeScaleDetail = 1.0f;

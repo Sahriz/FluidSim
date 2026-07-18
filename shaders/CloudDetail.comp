@@ -1,0 +1,44 @@
+#version 430 core
+layout(local_size_x = 8, local_size_y = 8, local_size_z = 8) in;
+layout(r32f, binding = 0) uniform writeonly image3D detail;
+
+#include "common.glsl"
+
+uniform float amplitude;
+uniform float lacunarity;
+uniform float persistance;
+uniform int octaves;
+uniform int dimension;
+uniform float time;
+uniform float numCells;
+uniform float timeScale;
+uniform int useTimeScale;
+
+float fbmWorley(vec3 p){
+	float accum = 0.0;
+	float amp = amplitude;
+	float maxValue = 0.0;
+	float ncells = numCells;
+	for(int i = 0; i < octaves; i++){
+		float val = amp * worley(p, ncells);
+		accum += val;
+		maxValue += amp;
+		ncells *= lacunarity;
+		amp *= persistance;
+	}
+	accum /= maxValue;
+	return accum;
+}
+
+float remap(float x, float a, float b, float c, float d) {
+    return c + (x - a) * (d - c) / (b - a);
+}
+
+void main() {
+	ivec3 texel = ivec3(gl_GlobalInvocationID);
+	vec3 timeOffset = useTimeScale == 1 ? vec3(time * timeScale, 0.0, 0.0) : vec3(0.0 , 0.0, 0.0);
+
+	float noiseValue = fbmWorley((vec3(texel) + timeOffset) / dimension);
+
+	imageStore(detail, texel, vec4(vec3(noiseValue),1.0));
+}

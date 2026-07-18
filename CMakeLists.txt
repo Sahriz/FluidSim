@@ -68,10 +68,14 @@ set(SOURCE_FILES
 set(SHADER_FILES
     shaders/render.vert
     shaders/render.frag
-    shaders/Noise.comp
     shaders/InitCompShader.comp
     shaders/TerrainRender.frag
     shaders/TerrainRender.vert
+    shaders/CloudBase.comp
+    shaders/CloudDetail.comp
+    shaders/common.glsl
+    shaders/FluidRender.vert
+    shaders/FluidRender.frag
 )
 
 source_group("Shaders" FILES ${SHADER_FILES})

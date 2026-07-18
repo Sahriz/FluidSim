@@ -95,9 +95,38 @@ private:
         return ss.str();
 
     }
+    static std::string preprocess(const std::string& source, const std::string& dir) {
+        std::stringstream out;
+        std::istringstream in(source);
+        std::string line;
+        int lineNum = 0;
+        while (std::getline(in, line)) {
+            lineNum++;
+            if (line.rfind("#include", 0) == 0) {
+                size_t a = line.find('"'), b = line.rfind('"');
+                if (a == std::string::npos || b <= a) {
+                    std::cerr << "[Shader] bad #include syntax: " << line << "\n";
+                    continue;
+                }
+                out << "#line 1\n";
+
+                out << readFile(dir + line.substr(a + 1, b - a - 1)) << "\n";
+                out << "#line " << (lineNum + 1) << "\n";
+            }
+            else {
+                out << line << "\n";
+            }
+        }
+        return out.str();
+        
+    }
 
     GLuint compileStage(GLenum type, const std::string& path) {
-        std::string source = readFile(path);
+        std::string raw = readFile(path);
+        if (raw.empty()) return 0;
+
+        std::string dir = path.substr(0, path.find_last_of("/\\") + 1);
+        std::string source = preprocess(raw, dir);
         if (source.empty()) return 0;
 
         GLuint shader = glCreateShader(type);
