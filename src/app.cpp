@@ -91,10 +91,11 @@ void App::handleInputs(GLFWwindow* window) {
     fInput.setKeyState(Key::Descend, glfwGetKey(window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS);
     fInput.setKeyState(Key::Ascend, glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS);
 
-    processInput(window);
+    
     if (!mouseToggle) {
         getMouseInput(window);
     }
+    processInput(window);
     fInput.updateKeyState();
 }
 
@@ -118,15 +119,18 @@ void App::processInput(GLFWwindow* window) {
         glfwSetWindowShouldClose(window, true);
     }
     if (fInput.isJustPressed(Key::ToggleMouse)) {
-        if (!mouseToggle) {
+        mouseToggle = !mouseToggle;
+        if (mouseToggle) {
             glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+            ImGui::GetIO().ConfigFlags &= ~ImGuiConfigFlags_NoMouseCursorChange;
+            fInput.firstMouse = true;
             fInput.dx = 0.0;
             fInput.dy = 0.0;
-            mouseToggle = !mouseToggle;
         }
         else {
-            glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_HIDDEN);
-            mouseToggle = !mouseToggle;
+            glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+            ImGui::GetIO().ConfigFlags &= ImGuiConfigFlags_NoMouseCursorChange;
+            
         }
     }
     fInput.inputDirection = glm::vec3(0.0);

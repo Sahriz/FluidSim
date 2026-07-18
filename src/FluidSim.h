@@ -271,7 +271,8 @@ private:
 	//3d textures
 	GLuint volumeTex;
 	GLuint detailTex;
-	GLuint volumeLoc, detailLoc;
+	GLuint frameTex;
+	GLuint volumeLoc, detailLoc, frameLoc;
 
 	//Noise variables
 	float amplitude = 1.0f;
