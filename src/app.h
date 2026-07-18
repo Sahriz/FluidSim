@@ -29,6 +29,7 @@ public:
     void getMouseInput(GLFWwindow* window);
     void processInput(GLFWwindow* window);
     void switchScene(SceneId id);
+    void onResize(int width, int height);
 
 private:
     Window window;

@@ -6,6 +6,10 @@ App::App(int width, int height, const char* title)
     bool initWindowSucess = window.init(m_width, m_height, title);
     
     if (!initWindowSucess) std::cout << "error setting up window" << std::endl;
+    glfwSetWindowUserPointer(window.window, this);
+    glfwSetFramebufferSizeCallback(window.window, [](GLFWwindow* win, int w, int h) {
+        static_cast<App*>(glfwGetWindowUserPointer(win))->onResize(w, h);
+        });
     initImGui();
     switchScene(SceneId::FluidSim);
 }
@@ -169,4 +173,13 @@ void App::switchScene(SceneId id) {
     }
 
     m_currentScene->onEnter();
+}
+
+void App::onResize(int width, int height) {
+    if (width == 0 || height == 0) return;
+
+    m_width = width;
+    m_height = height;
+    glViewport(0, 0, width, height);
+    if (m_currentScene) m_currentScene->onResize(width, height);
 }

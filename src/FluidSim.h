@@ -92,6 +92,15 @@ public:
 		glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_S, GL_REPEAT);
 		glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_T, GL_REPEAT);
 		glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_R, GL_REPEAT);
+
+		glGenTextures(1, &frameTex);
+		glBindTexture(GL_TEXTURE_2D, frameTex);
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, m_width, m_height, 0, GL_RGBA, GL_FLOAT, NULL);
+
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 	}
 
 	void onEnter() override {
@@ -131,6 +140,20 @@ public:
 		glDeleteVertexArrays(1, &VAO);
 		glDeleteTextures(1, &volumeTex);
 		glDeleteTextures(1, &detailTex);
+		glDeleteTextures(1, &frameTex);
+	}
+
+	void onResize(int width, int height) override {
+		m_width = width;
+		m_height = height;
+
+		float aspectRatio = float(m_width) / float(m_height);
+		m_camera.setAspect(aspectRatio);
+
+		if (frameTex != 0) {
+			glBindTexture(GL_TEXTURE_2D, frameTex);
+			glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, m_width, m_height, 0, GL_RGBA, GL_FLOAT, NULL);
+		}
 	}
 
 	void update(float dt, frameInput& in) override {

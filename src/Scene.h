@@ -15,6 +15,7 @@ public:
 
 	virtual void onEnter() = 0;
 	virtual void onExit() = 0;
+	virtual void onResize(int width, int height){}
 
 	virtual void update(float dt, frameInput& in) = 0;
 	virtual void render() = 0;

@@ -50,10 +50,6 @@ public:
 
     }
 
-    static void framebufferSizeCallback(GLFWwindow* window, int width, int height) {
-        glViewport(0, 0, width, height);
-    }
-
 	bool init(int width, int height, const char* title) {
 		glfwInit();
 		glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
@@ -79,8 +75,6 @@ public:
         glDebugMessageCallback(myCallback, nullptr);
 
         glViewport(0, 0, width, height);
-
-        glfwSetFramebufferSizeCallback(window, framebufferSizeCallback);
 
         glEnable(GL_CULL_FACE);
         glEnable(GL_DEPTH_TEST);
