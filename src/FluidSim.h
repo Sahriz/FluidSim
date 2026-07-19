@@ -213,15 +213,23 @@ public:
 		m_pipeline[PassBase].continuous = timeEffect;
 		m_pipeline[PassDetail].continuous = timeEffectDetail;
 		runPipeline(m_pipeline);
-		
-		m_skyShader.use();
-		glBindVertexArray(VAO);
-		m_skyShader.set("skyColor", skyColor);
-		glDrawArrays(GL_TRIANGLES, 0, 3);
-		m_cloudShader.use();
 		updateUniforms();
 		updateLightDirection();
-		
+
+		m_skyShader.use();
+		glBindVertexArray(VAO);
+		m_skyShader.set("lightDir", lightDir);
+		m_skyShader.set("zenithColor", zenithColor);
+		m_skyShader.set("horizonColor", horizonColor);
+		m_skyShader.set("sunColor", sunColor);
+		m_skyShader.set("sunIntensity", sunIntensity);
+		m_skyShader.set("sunSize", sunSize);
+		m_skyShader.set("glowStrength", glowStrength);
+		m_skyShader.set("glowFalloff", glowFalloff);
+		glDrawArrays(GL_TRIANGLES, 0, 3);
+
+
+		m_cloudShader.use();
 		glUniform1i(volumeLoc, 0);
 		glUniform1i(detailLoc, 1);
 		glActiveTexture(GL_TEXTURE0);
@@ -243,6 +251,8 @@ public:
 
 		
 		if (ImGui::CollapsingHeader("Cloud Settings", ImGuiTreeNodeFlags_DefaultOpen)) {
+
+			//Cloud base noise compute
 			auto& basePass = m_pipeline[PassBase];
 			if (ImGui::CollapsingHeader("Density Noise Settings", ImGuiTreeNodeFlags_DefaultOpen)) {
 				basePass.dirty |= ImGui::SliderFloat("Amplitude", &amplitude, 0.0f, 5.0f);
@@ -257,7 +267,7 @@ public:
 		
 			ImGui::Separator();
 		
-			//Second section
+			//Cloud detail noise compute
 			auto& detailPass = m_pipeline[PassDetail];
 			if (ImGui::CollapsingHeader("Detail Noise Settings", ImGuiTreeNodeFlags_DefaultOpen)) {
 				detailPass.dirty |= ImGui::SliderFloat("Detail Amplitude", &amplitudeDetail, 16, 256);
@@ -268,10 +278,20 @@ public:
 				detailPass.dirty |= ImGui::SliderFloat("Detail Time Scale", &timeScaleDetail, 0.0f, 25.0f);
 				detailPass.dirty |= ImGui::Checkbox("Detail Time Effect", &timeEffectDetail);
 			}
-		
+			
+			if (ImGui::CollapsingHeader("Sky settings", ImGuiTreeNodeFlags_DefaultOpen)) {
+				ImGui::SliderFloat3("Zenith Color", &zenithColor.x, 0.0f, 1.0f);
+				ImGui::SliderFloat3("Horizon Color", &horizonColor.x, 0.0f, 1.0f);
+				ImGui::SliderFloat3("Sun Color", &sunColor.x, 0.0f, 1.0f);
+				ImGui::SliderFloat("SunIntensity", &sunIntensity, 1.0f, 300.0f);
+				ImGui::SliderFloat("SunSize", &sunSize, 0.0f, 1.0f);
+				ImGui::SliderFloat("glowStrength", &glowStrength, 0.0f, 1.0f);
+				ImGui::SliderFloat("glowFalloff", &glowFalloff, 4.0f, 512.0f);
+			}
+
 			ImGui::Spacing();
 			ImGuiStyle& style = ImGui::GetStyle();
-		
+			//Composition and cloud rendering pass, needs to be seperated or otherwise updated to be split!
 			if (ImGui::CollapsingHeader("Render settings", ImGuiTreeNodeFlags_DefaultOpen)) {
 				float w1 = (ImGui::CalcItemWidth() - style.ItemInnerSpacing.x) / 2.0f;
 				float w2 = (ImGui::CalcItemWidth() - style.ItemInnerSpacing.x) / 3.0f;
@@ -342,6 +362,15 @@ private:
 	float numCellsDetail = 4;
 	bool timeEffectDetail = true;
 	float timeScaleDetail = 1.0f;
+
+	//Sky Shader variables
+	glm::vec3 zenithColor = glm::vec3(0.1f, 0.25f, 0.65f);
+	glm::vec3 horizonColor = glm::vec3(0.65f, 0.75f, 0.9f);
+	glm::vec3 sunColor = glm::vec3(1.0f, 1.0f, 1.0f);
+	float sunIntensity = 1.0f;
+	float sunSize = 0.9555f;
+	float glowStrength = 20.0f;
+	float glowFalloff = 64.0f;
 
 	//Shader variables
 	float azimuth = 63.4f, elevation = 27.6f;
