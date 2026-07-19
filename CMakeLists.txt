@@ -74,8 +74,9 @@ set(SHADER_FILES
     shaders/CloudBase.comp
     shaders/CloudDetail.comp
     shaders/common.glsl
-    shaders/FluidRender.vert
-    shaders/FluidRender.frag
+    shaders/Fullscreen.vert
+    shaders/Cloud.frag
+    shaders/Sky.frag
 )
 
 source_group("Shaders" FILES ${SHADER_FILES})

@@ -108,35 +108,39 @@ public:
 			std::cerr << "framebuffer incomplete\n";
 		}
 	}
-
+	
 	void onEnter() override {
+		std::string skyVertPath = std::string(SHADER_DIR) + "Fullscreen.vert";
+		std::string skyFragPath = std::string(SHADER_DIR) + "Sky.frag";
+
 		std::string cloudVertPath = std::string(SHADER_DIR) + "Fullscreen.vert";
 		std::string cloudFragPath = std::string(SHADER_DIR) + "Cloud.frag";
 
 		std::string compositeVertPath = std::string(SHADER_DIR) + "Fullscreen.vert";
 		std::string compositeFragPath = std::string(SHADER_DIR) + "Composite.frag";
 
-		m_shader.init(cloudVertPath, cloudFragPath);
+		m_skyShader.init(skyVertPath, skyFragPath);
+		m_cloudShader.init(cloudVertPath, cloudFragPath);
 		m_compositeShader.init(compositeVertPath, compositeFragPath);
 
 		InitProgram();
-		m_shader.use();
+		m_cloudShader.use();
 		float aspectRatio = float(m_width) / float(m_height);
 		m_camera.Init(70, aspectRatio, 0.1, 1000);
-		m_shader.set("boxMin", -dimensions / 2);
-		m_shader.set("boxMax", dimensions / 2);
+		m_cloudShader.set("boxMin", -dimensions / 2);
+		m_cloudShader.set("boxMax", dimensions / 2);
 
 		glDisable(GL_DEPTH_TEST);
 		glEnable(GL_BLEND);
-		glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);   // src*alpha + dst*(1-alpha)
+		glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);   // src*alpha + dst*(1-alpha)
 	}
 
 	void InitBuffers() {
 		glGenVertexArrays(1, &VAO);
 		glBindVertexArray(VAO);
 
-		volumeLoc = glGetUniformLocation(m_shader.ID, "volume");
-		detailLoc = glGetUniformLocation(m_shader.ID, "detailNoise");
+		volumeLoc = glGetUniformLocation(m_cloudShader.ID, "volume");
+		detailLoc = glGetUniformLocation(m_cloudShader.ID, "detailNoise");
 	}
 
 	void InitProgram() {
@@ -176,25 +180,24 @@ public:
 	}
 
 	void updateUniforms() {
-		m_shader.use();
-		m_shader.set("detailScale", detailScale);
-		m_shader.set("detailStrength", detailStrength);
-		m_shader.set("densityScale", densityScale);
-		m_shader.set("lightDir", lightDir);
-		m_shader.set("lightColor", lightColor);
-		m_shader.set("lightStrength", lightStrength);
-		m_shader.set("skyColor", skyColor);
-		m_shader.set("shadowDensity", shadowDensity);
-		m_shader.set("phaserG", phaserG);
-		m_shader.set("nearShadowReach", nearShadowReach);
-		m_shader.set("farShadowReach", farShadowReach);
-		m_shader.set("stepSize", stepSize);
-		m_shader.set("maxSteps", maxSteps);
-		m_shader.set("powderMix", powderMix);
-		m_shader.set("ambientColorTop", ambientColorTop);
-		m_shader.set("ambientColorBottom", ambientColorBottom);
-		m_shader.set("useJitter", useJitter ? 1 : 0);
-		m_shader.set("useDetailNoise", useDetailNoise ? 1 : 0);
+		m_cloudShader.use();
+		m_cloudShader.set("detailScale", detailScale);
+		m_cloudShader.set("detailStrength", detailStrength);
+		m_cloudShader.set("densityScale", densityScale);
+		m_cloudShader.set("lightDir", lightDir);
+		m_cloudShader.set("lightColor", lightColor);
+		m_cloudShader.set("lightStrength", lightStrength);
+		m_cloudShader.set("shadowDensity", shadowDensity);
+		m_cloudShader.set("phaserG", phaserG);
+		m_cloudShader.set("nearShadowReach", nearShadowReach);
+		m_cloudShader.set("farShadowReach", farShadowReach);
+		m_cloudShader.set("stepSize", stepSize);
+		m_cloudShader.set("maxSteps", maxSteps);
+		m_cloudShader.set("powderMix", powderMix);
+		m_cloudShader.set("ambientColorTop", ambientColorTop);
+		m_cloudShader.set("ambientColorBottom", ambientColorBottom);
+		m_cloudShader.set("useJitter", useJitter ? 1 : 0);
+		m_cloudShader.set("useDetailNoise", useDetailNoise ? 1 : 0);
 	}
 
 	void updateLightDirection() {
@@ -210,10 +213,15 @@ public:
 		m_pipeline[PassBase].continuous = timeEffect;
 		m_pipeline[PassDetail].continuous = timeEffectDetail;
 		runPipeline(m_pipeline);
-		m_shader.use();
+		
+		m_skyShader.use();
+		glBindVertexArray(VAO);
+		m_skyShader.set("skyColor", skyColor);
+		glDrawArrays(GL_TRIANGLES, 0, 3);
+		m_cloudShader.use();
 		updateUniforms();
 		updateLightDirection();
-		glBindVertexArray(VAO);
+		
 		glUniform1i(volumeLoc, 0);
 		glUniform1i(detailLoc, 1);
 		glActiveTexture(GL_TEXTURE0);
@@ -300,7 +308,8 @@ public:
 
 private:
 	int dimensions = 128;
-	Shader m_shader;
+	Shader m_skyShader;
+	Shader m_cloudShader;
 	Shader m_compositeShader;
 	std::vector<ComputePass> m_pipeline;
 	enum PassIndex { PassBase = 0, PassDetail = 1 };

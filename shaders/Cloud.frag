@@ -21,7 +21,6 @@ uniform float densityScale;
 uniform vec3 lightDir;
 uniform vec3 lightColor;
 uniform float lightStrength;
-uniform vec3 skyColor;
 
 uniform float shadowDensity;
 uniform vec3 phaserG;
@@ -110,7 +109,7 @@ void main() {
     tEnter = max(tEnter, 0.0);
     float tExit  = min(min(tbig.x, tbig.y), tbig.z);
 
-    if(tExit < 0.0 || tEnter > tExit) { FragColor = vec4(skyColor,1.0); return; }
+    if(tExit < 0.0 || tEnter > tExit) { discard; }
     float step = stepSize;
     int numSteps = int((tExit - tEnter) / step) + 1;  // limit to 100 steps for performance
     if(numSteps > maxSteps){
@@ -151,7 +150,5 @@ void main() {
         }  
         if(transmittance < 0.01) break;  // early exit if almost opaque
     }
-    
-    
-    FragColor = vec4(color + skyColor * transmittance, 1.0);
+    FragColor = vec4(color, 1.0 - transmittance);
 }
