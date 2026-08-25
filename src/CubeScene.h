@@ -21,6 +21,11 @@ public:
 		float aspectRatio = float(m_width) / float(m_height);
 		m_camera.Init(70, aspectRatio, 0.1, 100, m_shader.ID);
 		scaleLoc = glGetUniformLocation(m_shader.ID, "scale");
+
+		glEnable(GL_DEPTH_TEST);
+		glEnable(GL_CULL_FACE);
+		glDisable(GL_BLEND);
+		glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 	}
 
 	void initCube() {

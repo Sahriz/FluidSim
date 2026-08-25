@@ -131,6 +131,7 @@ public:
 		m_cloudShader.set("boxMax", dimensions / 2);
 
 		glDisable(GL_DEPTH_TEST);
+		glDisable(GL_CULL_FACE);
 		glEnable(GL_BLEND);
 		glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);   // src*alpha + dst*(1-alpha)
 	}

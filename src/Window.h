@@ -35,7 +35,7 @@ public:
         case GL_DEBUG_TYPE_UNDEFINED_BEHAVIOR: typ = "Undefined Behavior"; break;
         case GL_DEBUG_TYPE_PORTABILITY: typ = "Portability"; break;
         case GL_DEBUG_TYPE_PERFORMANCE: typ = "Performance"; break;
-
+		default: typ = "Other"; break;
         }
 
         const char* sev;
@@ -50,7 +50,7 @@ public:
 
     }
 
-	bool init(int width, int height, const char* title) {
+	bool init(int& width, int& height, const char* title) {
 		glfwInit();
 		glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
 		glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 6);

@@ -23,7 +23,12 @@ void App::initImGui() {
 }
 
 App::~App() {
-    // TODO: tear down GL resources and the window.
+    m_currentScene.reset();
+
+    ImGui_ImplOpenGL3_Shutdown();
+    ImGui_ImplGlfw_Shutdown();
+    ImGui::DestroyContext();
+    glfwTerminate();
 }
 
 void App::drawCommonUI() {
@@ -75,12 +80,9 @@ void App::run() {
         glfwPollEvents();
         previousTime = time;
     }
-    m_currentScene->onExit();
-    ImGui_ImplOpenGL3_Shutdown();
-    ImGui_ImplGlfw_Shutdown();
-    ImGui::DestroyContext();
+    
 
-    glfwTerminate();
+    
 }
 
 void App::handleInputs(GLFWwindow* window) {

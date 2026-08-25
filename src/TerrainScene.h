@@ -49,6 +49,11 @@ public:
 		freqLoc = glGetUniformLocation(m_shader.ID, "frequency");
 		lacLoc = glGetUniformLocation(m_shader.ID, "lacunarity");
 		perLoc = glGetUniformLocation(m_shader.ID, "persistance");
+
+		glEnable(GL_DEPTH_TEST);
+		glEnable(GL_CULL_FACE);
+		glDisable(GL_BLEND);
+		glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 	}
 
 	void initTerrain() {
