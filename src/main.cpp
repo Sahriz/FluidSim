@@ -3,7 +3,7 @@
 
 int main() {
     try {
-        App app(1280, 720, "Application");
+        App app(2560, 1440, "Application");
         app.run();
     } catch (const std::exception& e) {
         std::cerr << "Error: " << e.what() << "\n";

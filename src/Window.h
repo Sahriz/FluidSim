@@ -56,12 +56,25 @@ public:
 		glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 6);
 		glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 		glfwWindowHint(GLFW_OPENGL_DEBUG_CONTEXT, GLFW_TRUE);
+
+        //temporary, will be replaced with proper flag later
+        if (true) {
+			const GLFWvidmode* mode = glfwGetVideoMode(glfwGetPrimaryMonitor());
+			width = mode->width;
+			height = mode->height;
+			glfwWindowHint(GLFW_DECORATED, GLFW_FALSE);
+        }
 		window = glfwCreateWindow(width, height, title, NULL, NULL);
 
         if (window == NULL) {
             std::cout << "Failed to create GLFW window" << std::endl;
             glfwTerminate();
             return false;
+        }
+
+        //temporary, will be replaced with proper flag later
+        if (true) {
+			glfwSetWindowPos(window, 0, 0);
         }
         glfwMakeContextCurrent(window);
 

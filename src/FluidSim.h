@@ -213,8 +213,9 @@ public:
 		m_pipeline[PassBase].continuous = timeEffect;
 		m_pipeline[PassDetail].continuous = timeEffectDetail;
 		runPipeline(m_pipeline);
-		updateUniforms();
 		updateLightDirection();
+		updateUniforms();
+		
 
 		m_skyShader.use();
 		glBindVertexArray(VAO);
